@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="com.rusanu.dataconnectiondialog" Version="1.0.0.1" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.8.2" />
+    <PackageReference Include="System.Drawing.Common" Version="4.7.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DBBackupLib\DBBackupLib.csproj" />
+  </ItemGroup>
+  <!--<ItemGroup>
+    <Reference Include="System.Windows.Forms">
+      <HintPath>bin\Debug\netstandard2.0\System.Windows.Forms.dll</HintPath>
+    </Reference>
+  </ItemGroup>-->
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms">
+      <HintPath>C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.7.2\System.Windows.Forms.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="PresentationFramework">
+      <HintPath>..\..\..\PresentationFramework.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>
