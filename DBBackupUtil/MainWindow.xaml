@@ -3,8 +3,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:DBBackupUtil" ResizeMode="CanMinimize"  
-        mc:Ignorable="d" Title="Backup" Height="263" Width="761" Background="#FFCAF3BE">
+        xmlns:Behaviors="http://schemas.microsoft.com/xaml/behaviors"
+        xmlns:i="http://schemas.microsoft.com/expression/2010/interactivity"
+        xmlns:local="clr-namespace:DBBackupUtil" ResizeMode="NoResize"  
+        mc:Ignorable="d" Title="Backup" Height="340" Width="800" Background="#FFCAF3BE">
     <WindowChrome.WindowChrome>
         <!--<WindowChrome GlassFrameThickness="5"
                       UseAeroCaptionButtons="False"
@@ -29,8 +31,10 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="Blue"/>
+                    <Setter Property="Background" Value="Gold"/>
                     <Setter Property="Foreground" Value="#fff"/>
+                    <Setter Property="FontSize" Value="16"/>
+                    <Setter Property="FontWeight" Value="Bold"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -133,7 +137,6 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
-
         <Style TargetType="Button" x:Key="btnLightRed">
             <Setter Property="Background" Value="#fff"/>
             <Setter Property="Foreground" Value="#000"/>
@@ -197,27 +200,22 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
         <!--Minimize-->
         <Style x:Key="MinimizeButtonStyle" TargetType="Button" BasedOn="{StaticResource CaptionButtonStyle}">
             <Setter Property="Content" Value="&#xE949;"/>
         </Style>
-
         <!--Maximize-->
         <Style x:Key="MaximizeButtonStyle" TargetType="Button" BasedOn="{StaticResource CaptionButtonStyle}">
             <Setter Property="Content" Value="&#xE739;"/>
         </Style>
-
         <!--Restore-->
         <Style x:Key="RestoreButtonStyle" TargetType="Button" BasedOn="{StaticResource CaptionButtonStyle}">
             <Setter Property="Content" Value="&#xE923;"/>
         </Style>
-
         <!--Close-->
         <Style x:Key="CloseButtonStyle" TargetType="Button" BasedOn="{StaticResource CaptionButtonStyle}">
             <Setter Property="Content" Value="&#xE106;"/>
         </Style>
-
         <Style TargetType="TextBox">
             <Setter Property="VerticalAlignment" Value="Center"></Setter>
             <Setter Property="MinWidth" Value="100"></Setter>
@@ -233,21 +231,21 @@
         <CommandBinding Command="{x:Static SystemCommands.MinimizeWindowCommand}" CanExecute="CommandBinding_CanExecute" Executed="CommandBinding_Executed_Minimize" />
         <CommandBinding Command="{x:Static SystemCommands.RestoreWindowCommand}" CanExecute="CommandBinding_CanExecute" Executed="CommandBinding_Executed_Restore" />
     </Window.CommandBindings>
-    <Border x:Name="MainWindowBorder" BorderBrush="LightCoral" BorderThickness="0" >
-        <Grid x:Name="parentContainer" Background="LightBlue" IsEnabled="{Binding MainViewModel.IsProcessing.Value, Source={StaticResource ServiceLocator}, Mode=OneWay, Converter={StaticResource NegatingConverter}}">
+    <Border x:Name="MainWindowBorder" BorderBrush="LightCoral" BorderThickness="0" Margin="0,0,0,0" >
+        <Grid x:Name="parentContainer" Background="LightBlue" IsEnabled="{Binding MainViewModel.IsProcessing.Value, Source={StaticResource ServiceLocator}, Mode=OneWay, Converter={StaticResource NegatingConverter}}" Margin="0,0,0,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="125*"/>
-                <ColumnDefinition Width="636*"/>
+                <ColumnDefinition Width="123*"/>
+                <ColumnDefinition Width="677*"/>
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
-                <RowDefinition Height ="Auto"/>
-                <RowDefinition Height ="*"/>
+                <RowDefinition Height="31*" />
+                <RowDefinition Height="273*"/>
             </Grid.RowDefinitions>
             <!--Window chrome-->
-            <Grid Grid.Row="0" Background="#F999" Grid.ColumnSpan="2">
+            <Grid Background="#F999" Grid.ColumnSpan="2" Height="35" VerticalAlignment="top">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
                     <!--App icon-->
-                    <Image Source="/Resources/watermelon.ico" Width="18" Margin="2" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                    <Image Source="/Resources/watermelon.ico" Width="18" Margin="2" VerticalAlignment="Center" />
                     <TextBlock Text="Backup Utility" FontFamily="Arial" FontSize="16" FontWeight="Bold" Margin="4 3 0 0" />
                 </StackPanel>
                 <!--Caption buttons-->
@@ -259,46 +257,111 @@
                 </StackPanel>
             </Grid>
             <!--App content-->
-            <Grid Grid.Row="1" x:Name="AppArea" Grid.ColumnSpan="2">
-                <Grid Margin="0,0,10,8">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="48*"/>
-                        <RowDefinition Height="58*"/>
-                        <RowDefinition Height="103*"/>
-                    </Grid.RowDefinitions>
+            <WrapPanel Grid.Row="1" Margin="10,5,5,5" Grid.ColumnSpan="2">
+                <Grid x:Name="AppArea" Width="786">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="167*"/>
-                        <ColumnDefinition Width="633*"/>
+                        <ColumnDefinition Width="101*"/>
+                        <ColumnDefinition Width="161*"/>
                     </Grid.ColumnDefinitions>
-                    <Label Content="Database" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="16" FontWeight="DemiBold" Width="147" Height="37"/>
-                    <TextBox x:Name="txtConnectionString" Grid.Column="1" Text="{Binding MainViewModel.CStringDBToBackup, Source={StaticResource ServiceLocator}, Mode=TwoWay}" Margin="10,0,95,0" Height="23"/>
-                    <Label Grid.Row="1" Content="Backup Folder" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="16" FontWeight="DemiBold" Width="146" Height="37"/>
-                    <TextBox Grid.Row="1" Name="txtFolder" Grid.Column="1" Text="{Binding MainViewModel.BackupFolderPath, Source={StaticResource ServiceLocator}, Mode=TwoWay}" Margin="10,0,95,0" Height="23"/>
-                    <Button x:Name="btnSelectFolder" Content="Folder" Grid.Column="1" HorizontalAlignment="Left" Margin="504,13,0,14" Grid.Row="1" Width="80" Click="btnSelectFolder_Click"/>
-                    <Button x:Name="btnDatabase" Content="Database" Grid.Column="1" HorizontalAlignment="Left" Margin="504,0,0,0" VerticalAlignment="Center" Height="37" Width="80" Click="btnDatabase_Click"  />
-                    <Button Content="Start Uploading To GDrive" Name="btnGDriveList" Style="{StaticResource btnGDriveList}"  Grid.Column="1" HorizontalAlignment="Left" Margin="10,3,0,0" Grid.Row="2" VerticalAlignment="Top" Height="39" Width="218"
-                            IsEnabled="{Binding MainViewModel.IsProcessing.Value, Source={StaticResource ServiceLocator}, Mode=OneWay, Converter={StaticResource NegatingConverter}, NotifyOnTargetUpdated=True}" 
-                            Command="{Binding MainViewModel.BackupCommand, Source={StaticResource ServiceLocator}}">
-
-                    </Button>
-                    <Button Content="Cancel" x:Name="btnCancel" Click="btnCancel_Click" Grid.Column="1" HorizontalAlignment="Left" Margin="254,3,0,0" Grid.Row="2" VerticalAlignment="Top" Height="39" Width="166"/>
-                    <StackPanel Grid.Row="2" Margin="0,2,10,0">
-                        <TextBox x:Name="txtBackUpInterval" HorizontalAlignment="Left" TextAlignment="Center" VerticalContentAlignment="Center" Margin="10,0,0,0" FontSize="30" TextWrapping="Wrap" Width="94" Height="39"
-                            Text="{Binding MainViewModel.BackupIntervalInMins, Source={StaticResource ServiceLocator}, Mode=TwoWay, UpdateSourceTrigger=Explicit}" IsEnabled="{Binding MainViewModel.IsProcessing.Value, Source={StaticResource ServiceLocator}, Mode=OneWay,  Converter={StaticResource NegatingConverter}}">
-                            <TextBox.InputBindings>
-                                <KeyBinding Gesture="Enter" Command="{Binding MainViewModel.SetBackupIntervalCommand, Source={StaticResource ServiceLocator}}" CommandParameter="{Binding RelativeSource={RelativeSource FindAncestor,AncestorType={x:Type TextBox}},Path=Text}"/>
-                            </TextBox.InputBindings>
-                        </TextBox>
-                        <TextBlock Margin="10,2,5,0"><Run Foreground="Red" FontSize="10" FontWeight="Bold">Backup interval : </Run><LineBreak></LineBreak>
-                            <TextBlock Margin="10,0,0,0" Foreground="Red" FontSize="10" FontWeight="Bold" Text="{Binding MainViewModel.BackupIntervalInMins, Source={StaticResource ServiceLocator}, Mode=TwoWay}"></TextBlock>
-                            <Run Foreground="Red" FontSize="10" FontWeight="Bold"> minutes</Run>
-                        </TextBlock>
-                    </StackPanel>
+                    <Grid Margin="0,0,10,0" Height="285" VerticalAlignment="Top" Grid.ColumnSpan="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="133*"/>
+                            <RowDefinition Height="51*"/>
+                            <RowDefinition Height="101*"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="69*"/>
+                            <ColumnDefinition Width="319*"/>
+                        </Grid.ColumnDefinitions>
+                        <Label Content="Database" HorizontalAlignment="Left" VerticalAlignment="Top" FontSize="20" FontWeight="DemiBold" Width="128" Height="38" Margin="0,23,0,0"/>
+                        <ScrollViewer x:Name="sv" Grid.Column="1" Margin="2,2,2,10" ScrollViewer.VerticalScrollBarVisibility="Visible" CanContentScroll="True">                            
+                            <ItemsControl x:Name="icCS" Margin="2,2,5,2" SelectiveScrollingGrid.SelectiveScrollingOrientation="Vertical">                                
+                                <ItemsControl.ItemsSource><Binding Path="MainViewModel.CStringsDBToBackup" Source="{StaticResource ServiceLocator}"/></ItemsControl.ItemsSource>                            
+                                <ItemsControl.ItemTemplate>                                    
+                                    <DataTemplate>
+                                        <StackPanel Margin="2,2,2,2">
+                                            <i:Interaction.Behaviors>
+                                                <local:ScrollToBehavior IsProcessing="{Binding IsProcessing.Value}" />
+                                            </i:Interaction.Behaviors>                                            
+                                            <Grid Margin="5,0,0,0"  Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType={x:Type StackPanel}}}" HorizontalAlignment="Left" MinHeight="42" Height="44" >
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="95*"/>
+                                                    <ColumnDefinition Width="8*"/>
+                                                    <ColumnDefinition Width="8*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Border BorderThickness="3" BorderBrush="Blue" CornerRadius="5">
+                                                    <TextBox x:Name="txtConnectionString" VerticalContentAlignment="Center" IsEnabled="{Binding IsProcessing.Value, Converter={StaticResource NegatingConverter}, NotifyOnTargetUpdated=True}" Text="{Binding SqlConnectionString, Mode=TwoWay}" SelectionBrush="#FFDADADA" FontSize="23" Height="42">
+                                                        </TextBox>
+                                                    <Border.Style>
+                                                        <Style>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsProcessing.Value}" Value="True">
+                                                                    <Setter Property="local:ScrollToBehavior.IsProcessing" Value="True"/>
+                                                                    <DataTrigger.EnterActions>
+                                                                        <BeginStoryboard x:Name="sbCS">
+                                                                            <Storyboard Storyboard.TargetProperty="BorderBrush.Color">                                                                                
+                                                                                <ColorAnimation From="Red" To="#FF3AFF00" Duration="0:0:1" AutoReverse="True" RepeatBehavior="Forever" />
+                                                                            </Storyboard>
+                                                                        </BeginStoryboard>
+                                                                    </DataTrigger.EnterActions>
+                                                                    <DataTrigger.ExitActions>
+                                                                        <StopStoryboard BeginStoryboardName="sbCS"></StopStoryboard>
+                                                                    </DataTrigger.ExitActions>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding HasErrors}" Value="True">                                                                    
+                                                                    <DataTrigger.EnterActions>                                                                        
+                                                                        <StopStoryboard BeginStoryboardName="sbCS"></StopStoryboard>
+                                                                        <BeginStoryboard x:Name="sbCSError">
+                                                                            <Storyboard Storyboard.TargetProperty="BorderBrush.Color">
+                                                                                <ColorAnimation From="Red" To="Red" Duration="0:0:1" AutoReverse="True" RepeatBehavior="Forever" />
+                                                                            </Storyboard>
+                                                                        </BeginStoryboard>
+                                                                    </DataTrigger.EnterActions>
+                                                                    <DataTrigger.ExitActions>
+                                                                        <StopStoryboard BeginStoryboardName="sbCSError"></StopStoryboard>
+                                                                    </DataTrigger.ExitActions>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                </Border>
+                                                <Button x:Name="btnChangeDatabase" Click="btnDatabase_Click" Tag="{Binding }" Margin="5,0,0,0"  HorizontalAlignment="Right" Grid.Column="1" Height="38" ToolTip="Change Connection String">
+                                                    <Path x:Name="pathChangeConnectionString" Width="20"  Height="20" Data="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z" Fill="Red" Stretch="Uniform" />
+                                                </Button>
+                                                <Button x:Name="btnRemoveDatabase" Command="{Binding MainViewModel.RemoveConnectionStringCommand, Source={StaticResource ServiceLocator}}" CommandParameter="{Binding }" HorizontalAlignment="Left" Grid.Column="2" ToolTip="Remove Database from Backup List" Margin="5,0,0,0" Height="38">
+                                                    <Path x:Name="pathRemoveDB" Width="20" Height="20" Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" Fill="Red" Stretch="Uniform" />
+                                                </Button>
+                                            </Grid>                                            
+                                            <GridSplitter Height="1" Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType={x:Type StackPanel}}}" Margin="1,3,1,1" IsEnabled="False"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                        <Label Grid.Row="1" Content="Backup Folder" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20" FontWeight="DemiBold" Width="138" Height="38"/>
+                        <TextBox Grid.Row="1" x:Name="txtFolder" Grid.Column="1" VerticalContentAlignment="Center" Text="{Binding MainViewModel.BackupFolderPath, Mode=TwoWay, Source={StaticResource ServiceLocator}}" HorizontalAlignment="Left" Margin="10,0,0,0" Padding="2,0,0,2" FontSize="22" FontWeight="Bold" MinHeight="45" Height="46" Width="528"/>
+                        <Button x:Name="btnSelectFolder" Content="Folder" Grid.Column="1" HorizontalAlignment="Left" Margin="543,0,0,0" Grid.Row="1" Width="90" Click="btnSelectFolder_Click" Height="40" VerticalAlignment="Center"/>
+                        <Button Content="Start Uploading To GDrive" x:Name="btnGDriveList" Style="{StaticResource btnGDriveList}"  Grid.Column="1" HorizontalAlignment="Left" Margin="69,6,0,0" Grid.Row="2" VerticalAlignment="Top" Height="40" Width="218" IsEnabled="{Binding MainViewModel.IsProcessing.Value, Converter={StaticResource NegatingConverter}, Mode=OneWay, NotifyOnTargetUpdated=True, Source={StaticResource ServiceLocator}}" 
+                            Command="{Binding MainViewModel.BackupCommand, Source={StaticResource ServiceLocator}}"/>
+                        <Button Content="Cancel" x:Name="btnCancel" Click="btnCancel_Click" Grid.Column="1" HorizontalAlignment="Left" Margin="304,6,0,0" Grid.Row="2" VerticalAlignment="Top" Height="40" Width="166"/>
+                        <StackPanel Grid.Row="2" Margin="0,5,10,5">
+                            <TextBox x:Name="txtBackUpInterval" HorizontalAlignment="Left" TextAlignment="Center" VerticalContentAlignment="Center" Margin="10,0,0,0" FontSize="30" TextWrapping="Wrap" Width="94" Height="39" Text="{Binding MainViewModel.BackupIntervalInMins, Mode=TwoWay, Source={StaticResource ServiceLocator}, UpdateSourceTrigger=Explicit}" 
+                                     IsEnabled="{Binding MainViewModel.IsProcessing.Value, Converter={StaticResource NegatingConverter}, Mode=OneWay, Source={StaticResource ServiceLocator}}">
+                                <TextBox.InputBindings>
+                                    <KeyBinding Gesture="Enter" Command="{Binding MainViewModel.SetBackupIntervalCommand, Source={StaticResource ServiceLocator}}" CommandParameter="{Binding Text, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type TextBox}}}"/>
+                                </TextBox.InputBindings>
+                            </TextBox>
+                            <TextBlock Margin="10,2,5,0"><Run Foreground="Red" FontSize="10" FontWeight="Bold" Text="Backup interval :"/><LineBreak/>
+                                <InlineUIContainer><TextBlock Margin="10,0,0,0" Foreground="Red" FontSize="10" FontWeight="Bold" Text="{Binding MainViewModel.BackupIntervalInMins, Mode=TwoWay, Source={StaticResource ServiceLocator}}"/></InlineUIContainer><Run Text=" "/><Run Foreground="Red" FontSize="10" FontWeight="Bold" Text="minutes"/></TextBlock>
+                        </StackPanel>
+                        <Button HorizontalAlignment="Left" Margin="31,65,0,0" Name="btnAddConnectionString" Click="btnAddConnectionString_Click" VerticalAlignment="Top" Width="32" Height="28">
+                            <Path Stretch="Fill" Fill="Red" Stroke="{x:Null}" StrokeThickness="3" Data="M3.875,0 L5.125,0 5.125,3.875 9,3.875 9,5.125 5.125,5.125 5.125,9 3.875,9 3.875,5.125 0,5.125 0,3.875 3.875,3.875 3.875,0 z" />
+                        </Button>
+                    </Grid>
                 </Grid>
-            </Grid>
-            <TextBlock Name="lblErrorMsg" FontSize="20" FontWeight="Bold" Foreground="Red" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" HorizontalAlignment="Left" Margin="91,155,0,0" Grid.Row="1" VerticalAlignment="Top" Width="660"
-                       Text="{Binding MainViewModel.LastBackupExceptionMsg.Value, Source={StaticResource ServiceLocator}, Mode=OneWay}" Grid.ColumnSpan="2" Height="56">
-            </TextBlock>
+            </WrapPanel>
+            <TextBlock Name="lblErrorMsg" FontSize="20" FontWeight="Bold" Foreground="Red" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" HorizontalAlignment="Left" Margin="99,250,0,1" Grid.Row="1" Width="701"
+                       Text="{Binding MainViewModel.LastBackupExceptionMsg.Value, Source={StaticResource ServiceLocator}, Mode=OneWay}" Grid.ColumnSpan="2"/>
         </Grid>
     </Border>
 </Window>

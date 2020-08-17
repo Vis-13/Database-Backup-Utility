@@ -6,11 +6,13 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Markup;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Drive.v3;
 using Google.Apis.Drive.v3.Data;
 using Google.Apis.Services;
 using Google.Apis.Upload;
+using Google.Apis.Util;
 using Google.Apis.Util.Store;
 using File = Google.Apis.Drive.v3.Data.File;
 
@@ -21,8 +23,10 @@ namespace DBBackupLib
         static string[] Scopes = { DriveService.Scope.Drive };
         static string ApplicationName = "Backup Database";
         static string FileUploadDescription = "File uploaded by Golden Backup Utility";
+        static string UploadIdKey = "UpId";
 
         public static bool IsUploadingFile { get; private set; }
+        public static bool IsDeletingFile { get; private set; }
 
         /// a Valid authenticated DriveService
         /// The title of the file. Used to identify file or folder name.
@@ -109,9 +113,7 @@ namespace DBBackupLib
 
         public static UserCredential GetUserCredential() {
             UserCredential credential;
-
-            using (var stream =
-                new FileStream("BackupDBCredential.json", FileMode.Open, FileAccess.Read))
+            using (var stream = new FileStream("BackupDBCredential.json", FileMode.Open, FileAccess.Read))
             {
                 // The file token.json stores the user's access and refresh tokens, and is created
                 // automatically when the authorization flow completes for the first time.
@@ -132,7 +134,7 @@ namespace DBBackupLib
             return service;
         }
 
-        public static async Task<IUploadProgress> UploadFile(string uploadFile)
+        public static async Task<IUploadProgress> UploadFile(string uploadFile, Dictionary<string, string> appFileAttributes = null)
         {
             IsUploadingFile = true;
             DriveService service = GetGDriveService();
@@ -144,16 +146,33 @@ namespace DBBackupLib
                 body.Name = Path.GetFileName(uploadFile);
                 _uploadFilename = body.Name;
                 body.Description = FileUploadDescription;
+                body.Properties = appFileAttributes;
                 body.MimeType = GetMimeType(uploadFile);
+                //body.Id = DateTime.Now.ToString("dd-HH:mm:ss.fffff");
+
+
                 try
                 {
                     // File's content.
                     byte[] byteArray = System.IO.File.ReadAllBytes(uploadFile);
-                    MemoryStream stream = new System.IO.MemoryStream(byteArray);
+                    MemoryStream stream = new MemoryStream(byteArray);
+
+                    //FilesResource.UpdateMediaUpload uploadRequest = service.Files.Update(f, "", stream, body.MimeType);
+                    FilesResource.CreateRequest cr = service.Files.Create(body);
+                    File f = cr.Execute();
+                    //FilesResource.CreateMediaUpload uploadRequest = service.Files.Create(f, stream, body.MimeType);
+                    //uploadRequest.Body.Id = DateTime.Now.ToString("dd-HH:mm:ss.fffff");
+                    //body.Id = "WRJskjslkdjslj3q9";
                     FilesResource.CreateMediaUpload uploadRequest = service.Files.Create(body, stream, body.MimeType);
+                    //FilesResource.CreateMediaUpload ur = new FilesResource.CreateMediaUpload(service, body, stream, body.MimeType);
+                    //uploadRequest.Fields = "Id";           
+                    //uploadRequest.Body.Properties = new Dictionary<string, string>();
+                    //uploadRequest.Body.Properties.Add("sdkjfs", "kdjskjd");
+                    uploadRequest.SupportsTeamDrives = true;
+                    uploadRequest.ResponseReceived += UploadRequest_ResponseReceived;
                     uploadRequest.ProgressChanged += UploadRequest_ProgressChanged;
                     // new Exception("Exception");
-                    progress = await uploadRequest.UploadAsync();//.UploadAsync();    
+                    progress = await uploadRequest.UploadAsync();//.UploadAsync();
                 }
                 catch (Exception e)
                 {
@@ -161,11 +180,55 @@ namespace DBBackupLib
                     throw;
                 }
                 finally { IsUploadingFile = false; }
-            }      
+            }
             service?.Dispose();
             return progress;// uploadedFile == null ? string.Empty : uploadedFile.Id;
         }
 
+        public static IUploadProgress UploadFile(string uploadFile, ref File file, Dictionary<string, string> appFileAttributes = null)
+        {
+            IsUploadingFile = true;
+            DriveService service = GetGDriveService();
+            IUploadProgress progress = null;
+            if (System.IO.File.Exists(uploadFile))
+            {
+                File body = new File();
+                body.Name = Path.GetFileName(uploadFile);
+                _uploadFilename = body.Name;
+                body.Description = FileUploadDescription;
+                body.Properties = appFileAttributes;
+                body.MimeType = GetMimeType(uploadFile);
+                try
+                {
+                    // File's content.
+                    byte[] byteArray = System.IO.File.ReadAllBytes(uploadFile);
+                    MemoryStream stream = new MemoryStream(byteArray);
+                    FilesResource.CreateMediaUpload uploadRequest = service.Files.Create(body, stream, body.MimeType);
+                    uploadRequest.Body.Properties = appFileAttributes;
+                    //uploadRequest.Body.Properties.Add("sdkjfs", "kdjskjd");
+                    uploadRequest.SupportsTeamDrives = true;
+                    uploadRequest.ResponseReceived += UploadRequest_ResponseReceived;
+                    uploadRequest.ProgressChanged += UploadRequest_ProgressChanged;
+                    // new Exception("Exception");
+                    progress = uploadRequest.Upload();//.UploadAsync();
+                    if (progress.Status == UploadStatus.Completed)
+                        file = uploadRequest.ResponseBody;
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine("An error occurred: " + e.Message);
+                    throw;
+                }
+                finally { IsUploadingFile = false; }
+            }
+            service?.Dispose();
+            return progress;// uploadedFile == null ? string.Empty : uploadedFile.Id;
+        }
+
+        private static void UploadRequest_ResponseReceived(File obj)
+        {
+
+        }
 
         static bool _hasProgressChangedStarted = false;
         static string _uploadFilename = string.Empty;
@@ -185,54 +248,73 @@ namespace DBBackupLib
 
         public static void ListFiles()
         {
-            UserCredential credential;
-
-            using (var stream =
-                new FileStream("BackupDBCredential.json", FileMode.Open, FileAccess.Read))
-            {
-                // The file token.json stores the user's access and refresh tokens, and is created
-                // automatically when the authorization flow completes for the first time.
-                string credPath = "token.json";
-                credential = GoogleWebAuthorizationBroker.AuthorizeAsync(
-                    GoogleClientSecrets.Load(stream).Secrets,
-                    Scopes,
-                    "user",
-                    CancellationToken.None,
-                    new FileDataStore(credPath, true)).Result;
-                Console.WriteLine("Credential file saved to: " + credPath);
-            }
-
             // Create Drive API service.
-            var service = new DriveService(new BaseClientService.Initializer()
-            {
-                HttpClientInitializer = credential,
-                ApplicationName = ApplicationName,
-            });
-
+            var service = GetGDriveService();
             // Define parameters of request.
             FilesResource.ListRequest listRequest = service.Files.List();
             listRequest.PageSize = 10;
             listRequest.Fields = "nextPageToken, files(id, name)";
 
             // List files.
-            IList<Google.Apis.Drive.v3.Data.File> files = listRequest.Execute()
-                .Files;
-            Console.WriteLine("Files:");
+            IList<Google.Apis.Drive.v3.Data.File> files = listRequest.Execute().Files;
+            Debug.WriteLine("Files:");
             if (files != null && files.Count > 0)
             {
                 foreach (var file in files)
                 {
-                    Console.WriteLine("{0} ({1})", file.Name, file.Id);
+                    Debug.WriteLine("{0} ({1})", file.Name, file.Id);
                 }
             }
             else
             {
-                Console.WriteLine("No files found.");
+                Debug.WriteLine("No files found.");
             }
-            Console.Read();
+            //.Read();
 
         }
 
+        public static Task<string> DeleteFileAsync(string gFileId) {
+            IsDeletingFile = true;
+            Task<string> deleteTask = null;
+            DriveService service = GetGDriveService();
+            try
+            {
+                FilesResource.DeleteRequest deleteRequest = service.Files.Delete(gFileId);
+                deleteTask = deleteRequest.ExecuteAsync();                
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine("An error occurred: " + e.Message);
+                throw;
+            }
+            finally { IsDeletingFile = false; }            
+            service?.Dispose();
+            return deleteTask;
+        }
+
+        public static string DeleteFile(string gFileId)
+        {
+            IsDeletingFile = true;
+            string deleteResult = "";
+            if (string.IsNullOrWhiteSpace(gFileId)) {
+                deleteResult = "gFileId is null or empty!";
+                return deleteResult;
+            }
+            DriveService service = GetGDriveService();
+            try
+            {
+                FilesResource.DeleteRequest deleteRequest = service.Files.Delete(gFileId);
+                deleteResult = deleteRequest.Execute();
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine("An error occurred: " + e.Message);
+                throw;
+            }
+            finally { IsDeletingFile = false; }
+            service?.Dispose();
+            return deleteResult;
+        }
     }
 
 

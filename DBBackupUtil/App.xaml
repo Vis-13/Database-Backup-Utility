@@ -3,9 +3,11 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:DBBackupUtil"
              xmlns:BackupLib="clr-namespace:DBBackupLib;assembly=DBBackupLib"
+             xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
              StartupUri="MainWindow.xaml" Startup="Application_Startup">
     <Application.Resources>
         <BackupLib:ServiceLocator x:Key="ServiceLocator"/>
         <BackupLib:NegatingConverter x:Key="NegatingConverter"/>
+        <!--<XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />-->
     </Application.Resources>
 </Application>

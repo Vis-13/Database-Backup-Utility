@@ -1,15 +1,23 @@
 ﻿using Google.Apis.Upload;
+using Google.Apis.Util;
+using Microsoft.VisualBasic.CompilerServices;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using Reactive.Bindings;
 using Reactive.Bindings.ObjectExtensions;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Data.Common;
 using System.Data.SqlClient;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Reactive.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Security.RightsManagement;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,7 +27,7 @@ using System.Windows.Markup;
 
 namespace DBBackupLib
 {
-    public class MainViewModel : NotifyPropertyChanged, IMainViewModel
+    public class MainViewModel : NotifyPropertyChanged, IMainViewModel, IDisposable
     {
         string _cstringDBToBackup = "Data Source=.;Initial Catalog=gfunjoker;Integrated Security=True";
         public string CStringDBToBackup { get { return _cstringDBToBackup; } set { Set(ref _cstringDBToBackup, value); } }
@@ -28,23 +36,35 @@ namespace DBBackupLib
         public string DatabaseNameToBackup { get { return _databaseNameToBackup; } set { Set(ref _databaseNameToBackup, value); } }
 
         string _backupFolderPath;
-        public string BackupFolderPath { get { return _backupFolderPath; } 
-            set { Set(ref _backupFolderPath, value); } }
+        public string BackupFolderPath { get { return _backupFolderPath; } set { Set(ref _backupFolderPath, value); } }
 
         string _backupQuery = "BACKUP DATABASE [{0}] TO DISK = '{1}'";
 
         int _backupIntervalInMins = 10;
-        public int BackupIntervalInMins { get { return _backupIntervalInMins; } set { if(Set(ref _backupIntervalInMins, value)) BackUpDatabaseInIntervals(); } }
+        public int BackupIntervalInMins { get { return _backupIntervalInMins; } set { if (Set(ref _backupIntervalInMins, value)) BackUpDatabaseInIntervals(); } }
 
         public int BackupIntervalInMilliSeconds { get { return (int)TimeSpan.FromMinutes(_backupIntervalInMins).TotalMilliseconds; } }
 
+        public ObservableCollection<CString> CStringsDBToBackup { get; set; } = new ObservableCollection<CString>();
+
+        CString _selectedCStringDBToBackup = null;
+        public CString SelectedCStringDBToBackup { get { return _selectedCStringDBToBackup; } set { Set(ref _selectedCStringDBToBackup, value); } }
+
         public ReactiveProperty<bool> IsProcessing { get; private set; } = new ReactiveProperty<bool>(false);
-       
+
         public ICommand BackupCommand { get; }
 
         public ICommand SetBackupIntervalCommand { get; }
 
+        public ICommand RemoveConnectionStringCommand { get; }
+
+        public ICommand AddConnectionStringCommand { get; }
+
+        public ICommand UpdateConnectionStringCommand { get; }
+
         public string CurrentDateTimeString { get { return DateTime.Now.ToString("dd-MM-yyyy_HH-mm-ss"); } }
+        
+        public string CurrentDTFileAppend { get { return DateTime.Now.ToString("dd-mm-ss"); } }// day, mins, secs
 
         public ReactiveProperty<bool> HasExceptionOccuredWhileBackingup { get; private set; } = new ReactiveProperty<bool>(false);
 
@@ -52,20 +72,44 @@ namespace DBBackupLib
 
         public ReactiveProperty<string> LastBackupExceptionMsg { get; private set; } = new ReactiveProperty<string>();
 
+        public string LastGDriveUploadId = "";
+        public string CurrentGDriveUploadId = "";
+        Dictionary<string, string> _fileAppAttributes = new Dictionary<string, string>();
+
+        List<FileToUpload> LastUploadedFiles = new List<FileToUpload>();
+
+        ObservableCollection<Task<FileToUpload>> LatestUploadedFiles = new ObservableCollection<Task<FileToUpload>>();
+
         public MainViewModel() {
             _backupFolderPath = ServiceProvider.TempBackupDir;
             BackupCommand = new[] { IsProcessing, HasExceptionOccuredWhileBackingup }.CombineLatest(M => !M[0] && !M[1]).ToReactiveCommand().WithSubscribe(StartDatabaseBackup);
             SetBackupIntervalCommand = new[] { IsProcessing }.CombineLatest(M => !M[0]).ToReactiveCommand<string>().WithSubscribe(SetBackupInervals);
+            RemoveConnectionStringCommand = new[] { IsProcessing }.CombineLatest(M => !M[0]).ToReactiveCommand<CString>().WithSubscribe(RemoveConnectionString);
+            AddConnectionStringCommand = new[] { IsProcessing }.CombineLatest(M => !M[0]).ToReactiveCommand<string>().WithSubscribe(AddConnectionString);
+            CStringsDBToBackup = CString.AddInit(true);
+            _fileAppAttributes.Add("UpId", "");
+            Task.Run(() => LastUploadedFiles = FileToUpload.GetFileToUploadListFromSettings());
         }
 
-        public void UploadFile(string tempFilePath, string currentTimeString) {
-            string uploadFilePath = //Directory.GetFiles(_backupFolderPath).FirstOrDefault(); 
-                                    Path.Combine(_backupFolderPath, "backup_" + currentTimeString + ".zip");
-            ZipFile.CreateFromDirectory(tempFilePath, uploadFilePath);            
-            IUploadProgress uploadProgress = GoogleApis.UploadFile(uploadFilePath).Result;
-            if (uploadProgress.Status == UploadStatus.Failed)
-                throw uploadProgress.Exception;           
-        }
+        //public void UploadFile(string tempFilePath, string currentTimeString, string databaseName) {
+        //    string uploadFilePath = //Directory.GetFiles(_backupFolderPath).FirstOrDefault(); 
+        //                            Path.Combine(_backupFolderPath, databaseName + "_backup_" + currentTimeString + ".zip");
+
+        //    //try
+        //    //{
+        //        ZipFile.CreateFromDirectory(tempFilePath, uploadFilePath);
+        //    //}
+        //    //catch (Exception ex) { 
+
+        //    //}
+        //    //IUploadProgress uploadProgress = GoogleApis.UploadFile(uploadFilePath, _fileAppAttributes).Result;
+        //    Google.Apis.Drive.v3.Data.File responseFile = null;
+        //    IUploadProgress uploadProgress = GoogleApis.UploadFile(uploadFilePath, ref responseFile,  _fileAppAttributes);
+        //    if (uploadProgress.Status == UploadStatus.Failed)
+        //        throw uploadProgress.Exception;
+        //    Directory.Delete(tempFilePath, true);
+        //    //LastUploadedFiles.Add(responseFile.Id);
+        //}
 
         public void StartDatabaseBackup() {
             Task t = Task.Run(() => {
@@ -74,7 +118,6 @@ namespace DBBackupLib
             });
             while (!t.Wait(10))
                 System.Windows.Forms.Application.DoEvents();
-            
         }
 
         public void SetBackupInervals(string txtInterval)
@@ -82,33 +125,70 @@ namespace DBBackupLib
             BackupIntervalInMins = int.Parse(txtInterval);
         }
 
+        private void RemoveConnectionString(CString index)
+        {
+            CStringsDBToBackup.Remove((CString)index);
+        }
+
+        private void AddConnectionString(string connectionString)
+        {
+            CString.Add(connectionString);
+        }
+
         public void BackUpDatabase() {
             HasExceptionOccuredWhileBackingup.Value = false;
             BackupUploadedSuccessfully.Value = false;
             IsProcessing.Value = true;           
-            LastBackupExceptionMsg.Value = "";            
-            try
+            LastBackupExceptionMsg.Value = "";
+            CurrentGDriveUploadId = DateTime.Now.ToString("dd-HH:mm:ss.fffff");
+            _fileAppAttributes["UpId"] = CurrentGDriveUploadId;
+            //LastUploadedFiles.Clear();
+            string currentTimeString = CurrentDTFileAppend;
+            foreach(CString cString in CStringsDBToBackup)
+                try
+                {
+                    SelectedCStringDBToBackup = cString;
+                    cString.IsProcessing.Value = true;                    
+                    CStringDBToBackup = cString.SqlConnectionString;
+                    DatabaseNameToBackup = cString.Database;
+                    SqlConnection sqlConnection = new SqlConnection(_cstringDBToBackup);
+                    sqlConnection.Open();
+                    if (!Directory.Exists(_backupFolderPath))
+                        Directory.CreateDirectory(_backupFolderPath);                    
+                    DirectoryInfo di = Directory.CreateDirectory(_backupFolderPath + "\\" + _databaseNameToBackup + currentTimeString);
+                    string tempBackupFilePath = Path.Combine(di.FullName, _databaseNameToBackup + ".bak");
+                    string backupQuery = string.Format(_backupQuery, DatabaseNameToBackup, tempBackupFilePath);
+                    using (SqlCommand cmd = new SqlCommand(backupQuery, sqlConnection))
+                        cmd.ExecuteNonQuery();
+                    sqlConnection.Dispose();
+                    //UploadFile(di.FullName, currentTimeString, cString.Database);
+                    Task<FileToUpload> fileToUploadTask = FileToUpload.UploadFile(di.FullName, cString, cString.Database + "_backup_" + currentTimeString + ".zip");
+                    LatestUploadedFiles.Add(fileToUploadTask);
+                    fileToUploadTask.Wait();
+                    if (fileToUploadTask.Status == TaskStatus.Faulted)
+                        SetException(fileToUploadTask.Exception);
+                    else
+                    {
+                        using (FileToUpload fileToDelete = fileToUploadTask.Result.Find(LastUploadedFiles))
+                            fileToDelete?.DeleteFromGDrive();
+                    }
+                    cString.IsProcessing.Value = false;
+                }
+                catch (Exception ex) {
+                    SetException(ex);
+                    //Thread.Sleep(5000);
+                }
+            IsProcessing.Value = false;
+            if (!HasExceptionOccuredWhileBackingup.Value)
             {
-                SqlConnection sqlConnection = new SqlConnection(_cstringDBToBackup);
-                sqlConnection.Open();
-                if (!Directory.Exists(_backupFolderPath))
-                    Directory.CreateDirectory(_backupFolderPath);
-                string currentTimeString = CurrentDateTimeString;
-                DirectoryInfo di = Directory.CreateDirectory(_backupFolderPath + "\\" + _databaseNameToBackup + currentTimeString);
-
-                string tempBackupFilePath = Path.Combine(di.FullName, _databaseNameToBackup + ".bak");
-                string backupQuery = string.Format(_backupQuery, DatabaseNameToBackup, tempBackupFilePath);
-                using (SqlCommand cmd = new SqlCommand(backupQuery, sqlConnection))
-                    cmd.ExecuteNonQuery();
-                sqlConnection.Dispose();
-                UploadFile(di.FullName, currentTimeString);
-                IsProcessing.Value = false;
                 BackupUploadedSuccessfully.Value = true;
+                LastUploadedFiles = LatestUploadedFiles.Select(lt => lt.Result).ToList();
+                LatestUploadedFiles = new ObservableCollection<Task<FileToUpload>>();
             }
-            catch (Exception ex) {
-                SetException(ex);
-                //Thread.Sleep(5000);
-            }                        
+            else
+            {
+                //SaveUploadsList();
+            }
         }
 
         void SetException(Exception ex) {
@@ -134,17 +214,24 @@ namespace DBBackupLib
         }
 
         void _timer_DurationElapsed(object state) {
+            if (!IsInScheduledHours())
+                return;
             IsProcessing.Value = true;
             BackUpDatabase();
             IsProcessing.Value = false;
             _timer.Change(TimeSpan.FromMilliseconds(BackupIntervalInMilliSeconds), Timeout.InfiniteTimeSpan);
         }
 
+        public bool IsInScheduledHours() {
+            return (DateTime.Now.Hour >= 7 && DateTime.Now.AddSeconds(-2).Hour < 11);                
+        }
+
         public void Dispose()
         {
+            FileToUpload.SaveFileToUploadList(LastUploadedFiles);
         }
+    
     }
-
 
     public class NotifyPropertyChanged : INotifyPropertyChanged
     {
@@ -178,7 +265,6 @@ namespace DBBackupLib
         }
     }
 
-
     public interface IMainViewModel {
 
         string CStringDBToBackup { get; set; }
@@ -190,6 +276,206 @@ namespace DBBackupLib
         void Dispose();
     }
 
+    public class CString : NotifyPropertyChanged {
+        
+        public static int CurrentIndex { get; private set; }
+
+        public const string ICString = "Initial Catalog=";
+
+        int _index;
+        public int Index { get { return _index; } private set { Set(ref _index, value); } }
+
+        public ReactiveProperty<bool> IsProcessing { get; set; } = new ReactiveProperty<bool>(false);
+
+        bool _hasErrors = false;
+        public bool HasErrors { get { return _hasErrors; } set { Set(ref _hasErrors, value); } }
+
+        string _sqlConnectionString = "";
+        public string SqlConnectionString { get { return _sqlConnectionString; } set { Set(ref _sqlConnectionString, value); Database = GetDatabaseFromConnectionString(_sqlConnectionString); } }
+
+        string _database = "";
+        public string Database { get { return _database; } set { Set(ref _database, value); } }
+
+        public static ObservableCollection<CString> CSStrings { get; }
+
+        static CString() {
+            CSStrings = new ObservableCollection<CString>();
+        }
+
+        public static void Add(string cs) {
+            CString cString = new CString() { Index = CurrentIndex++, SqlConnectionString = cs };
+            CSStrings.Add(cString);
+        }
+
+        public static void SetDatabaseFromConnectionString(CString cString) {
+            cString.Database = GetDatabaseFromConnectionString(cString.Database);           
+        }
+
+        public static string GetDatabaseFromConnectionString(string  cs) {
+            int idx = cs.IndexOf(ICString);
+            string database = "";
+            for (int i = 0; cs[idx + ICString.Length + i] != ';'; i++)
+                database += cs[idx + ICString.Length + i];
+            return database;
+        }
+
+        public static ObservableCollection<CString> AddInit(bool shouldClearFirst = false) {
+            if(shouldClearFirst)
+                CSStrings.Clear();
+            Add("Data Source=.;Initial Catalog=gfunjoker;Integrated Security=True");
+            Add("Data Source=.;Initial Catalog=AdventureWorks2012;Integrated Security=True");
+            Add("Data Source=.;Initial Catalog=Digiphoto_Test;Integrated Security=True");
+            Add("Data Source=.;Initial Catalog=VideoShare-30-07-20;Integrated Security=True");
+            Add("Data Source=.;Initial Catalog=ShoppingCart;Integrated Security=True");
+            return CSStrings;
+        }
+
+        public static void RemoveAll() {
+            CSStrings.Clear();
+        }
+    
+    }
+
+    public class FileToUpload : NotifyPropertyChanged, IDisposable {
+
+        public enum FileStatus { CreatingZip, Uploading, Uploaded, UploadFailed, DeletingTempFolder, DeletingLocalZip, DeletingGDriveZip }
+
+        public bool IsLocalTempFolderDeleted { get; private set; }
+
+        public bool IsLocalZipDeleted { get; private set; }
+
+        public bool IsGDriveZipDeleted { get; private set; }
+
+        public string LocalFilePath { get; private set; }
+
+        public string UploadedFileId { get; private set; }
+
+        public FileStatus eFileStatus { get; private set; }
+
+        public DateTime CreatedOn { get; private set; }
+
+        public DateTime ZipedOn { get; private set; }
+
+        public DateTime UploadedOn { get; private set; }
+
+        public string DatabaseToBackUp { get; private set; }
+
+        string CurrentGDriveUploadId = "";
+
+        CString _cString = null;
+
+        Dictionary<string, string> _fileAppAttributes = new Dictionary<string, string>();
+
+        public Task<string>? DeleteResultString { get; private set; } = null;
+
+        public const string LastestUploadedSettingFile = "LatestUploadedFiles.json";
+
+        public FileToUpload() {
+            eFileStatus = FileStatus.CreatingZip;
+            CreatedOn = DateTime.Now;
+            CurrentGDriveUploadId = CreatedOn.ToString("dd-HH:mm:ss.fffff");
+            _fileAppAttributes.Add("UpId", CurrentGDriveUploadId);       
+        }
+
+        public static async Task<FileToUpload> UploadFile(string tempBackupFolderPath, CString cString, string createZipFilename)
+        {
+            FileToUpload fileToUpload = new FileToUpload();
+            fileToUpload._cString = cString;
+            fileToUpload.DatabaseToBackUp = cString.SqlConnectionString;
+            int lastIndexOfPassword = -1;
+            if((lastIndexOfPassword = cString.SqlConnectionString.LastIndexOf("Password")) > 10)
+                fileToUpload.DatabaseToBackUp = cString.SqlConnectionString.Substring(0, lastIndexOfPassword);
+            await Task.Run(() =>
+            {
+                string uploadFilePath = Path.Combine(Path.GetDirectoryName(tempBackupFolderPath), createZipFilename);
+                //try
+                //{
+                ZipFile.CreateFromDirectory(tempBackupFolderPath, uploadFilePath);
+                //}
+                //catch (Exception ex) { 
+
+                //}
+                fileToUpload.eFileStatus = FileStatus.Uploading;
+                fileToUpload.LocalFilePath = uploadFilePath;
+                //IUploadProgress uploadProgress = GoogleApis.UploadFile(uploadFilePath, _fileAppAttributes).Result;
+                Google.Apis.Drive.v3.Data.File responseFile = null;
+                IUploadProgress uploadProgress = GoogleApis.UploadFile(uploadFilePath, ref responseFile, fileToUpload._fileAppAttributes);
+                if (uploadProgress.Status == UploadStatus.Failed)
+                {
+                    fileToUpload.eFileStatus = FileStatus.UploadFailed;
+                    throw uploadProgress.Exception;
+                }
+                Directory.Delete(tempBackupFolderPath, true);
+                fileToUpload.UploadedFileId = responseFile.Id;
+                fileToUpload.eFileStatus = FileStatus.Uploaded;
+                //return fileToUpload;
+            });
+            return fileToUpload;
+        }
+
+        //public static bool operator ==(FileToUpload f1, FileToUpload f2) {
+        //    return (f1._cString.SqlConnectionString == f2._cString.SqlConnectionString);
+        //}
+
+        //public static bool operator !=(FileToUpload f1, FileToUpload f2)
+        //{
+        //    return (f1._cString.SqlConnectionString != f2._cString.SqlConnectionString);
+        //}
+
+        public FileToUpload Find(IEnumerable<FileToUpload> files) {
+            FileToUpload fileToUpload1 = files.FirstOrDefault(f => !string.IsNullOrWhiteSpace(DatabaseToBackUp) && f.DatabaseToBackUp == DatabaseToBackUp);
+            return fileToUpload1;
+        }
+
+        public FileToUpload Find(IEnumerable<Task<FileToUpload>> files)
+        {
+            Task<FileToUpload> fileToUploadTask = files.FirstOrDefault(f => f.Result.DatabaseToBackUp == DatabaseToBackUp);
+            return fileToUploadTask?.Result;
+        }
+
+        public string DeleteFromGDriveResult { get; private set; }
+        public void DeleteFromGDrive()
+        {
+            Task.Run(() => { DeleteFromGDriveResult = GoogleApis.DeleteFile(UploadedFileId);
+                if (!string.IsNullOrWhiteSpace(DeleteFromGDriveResult))
+                    Logger.LogException(new Exception($"{LocalFilePath} could not be deleted from GDrive (Id: {UploadedFileId})", new Exception(DeleteFromGDriveResult)));
+                else
+                    IsGDriveZipDeleted = true;
+                    });
+            //DeleteResultString.ContinueWith(async t => 
+            //await Logger.LogException(new Exception(t.Result)));
+                //.Value.OnCompleted(async () => { await Logger.LogException(new Exception(result)); });
+            //DeleteResultString.Start();
+        }
+
+        public static void SaveFileToUploadList(IEnumerable<FileToUpload> latestUploadedFiles) {
+            string jsonLatestFilesUploaded = JsonConvert.SerializeObject(latestUploadedFiles.ToArray());
+            File.WriteAllText("LatestUploadedFiles.json", jsonLatestFilesUploaded);
+        }
+
+        public static List<FileToUpload> GetFileToUploadListFromSettings()
+        {
+            string jsonLastestFilesUplaoded = File.ReadAllText(LastestUploadedSettingFile);
+            JsonConvert.DefaultSettings = () => new JsonSerializerSettings { ContractResolver = new NonPublicPropertiesResolver() };
+            List<FileToUpload> filesUploaded = JsonConvert.DeserializeObject<List<FileToUpload>>(jsonLastestFilesUplaoded);            
+            return filesUploaded;
+        }
+
+        public async void Dispose()
+        {
+            string result = "";
+            try
+            {
+                //if (DeleteResultString.HasValue)
+                //    result = DeleteResultString.Value.GetResult();
+                if (!string.IsNullOrWhiteSpace(DeleteFromGDriveResult))
+                    await Logger.LogException(new Exception(DeleteFromGDriveResult));
+            }
+            catch (Exception ex) {
+                await Logger.LogException(ex);
+            }
+        }
+    }
 
     public class ViewCoreModule : IModule
     {
@@ -228,6 +514,20 @@ namespace DBBackupLib
         }
 
         public void Dispose() { }
+    }
+
+    public class NonPublicPropertiesResolver : DefaultContractResolver
+    {
+        protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
+        {
+            var prop = base.CreateProperty(member, memberSerialization);
+            if (member is PropertyInfo pi)
+            {
+                prop.Readable = (pi.GetMethod != null);
+                prop.Writable = (pi.SetMethod != null);
+            }
+            return prop;
+        }
     }
 
 
