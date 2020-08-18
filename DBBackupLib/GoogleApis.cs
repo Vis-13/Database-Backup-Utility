@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 //using System.IO;
 using System.Text;
 using System.Threading;
@@ -14,6 +15,7 @@ using Google.Apis.Services;
 using Google.Apis.Upload;
 using Google.Apis.Util;
 using Google.Apis.Util.Store;
+using Reactive.Bindings.ObjectExtensions;
 using File = Google.Apis.Drive.v3.Data.File;
 
 namespace DBBackupLib
@@ -198,6 +200,8 @@ namespace DBBackupLib
                 body.Description = FileUploadDescription;
                 body.Properties = appFileAttributes;
                 body.MimeType = GetMimeType(uploadFile);
+                body.Parents = new List<string>(new[] { "18-wjFxMidgdy9eJbZSY1xCtPIYR8cDgI" });
+                //body.Parents.Add(/*"Golden Database Backup(18 - */"wjFxMidgdy9eJbZSY1xCtPIYR8cDgI");
                 try
                 {
                     // File's content.
@@ -246,15 +250,16 @@ namespace DBBackupLib
             }
         }
 
-        public static void ListFiles()
+        public static IList<File> ListFiles()
         {
             // Create Drive API service.
             var service = GetGDriveService();
             // Define parameters of request.
             FilesResource.ListRequest listRequest = service.Files.List();
-            listRequest.PageSize = 10;
+            listRequest.PageSize = 50;
             listRequest.Fields = "nextPageToken, files(id, name)";
-
+            DriveList driveList = service.Drives.List().Execute();
+            driveList.Drives.Select(d => { Debug.WriteLine($"Drive: {d.Name}, Id: {d.Id}"); return d; }).ToList();
             // List files.
             IList<Google.Apis.Drive.v3.Data.File> files = listRequest.Execute().Files;
             Debug.WriteLine("Files:");
@@ -270,7 +275,7 @@ namespace DBBackupLib
                 Debug.WriteLine("No files found.");
             }
             //.Read();
-
+            return files;
         }
 
         public static Task<string> DeleteFileAsync(string gFileId) {
@@ -292,7 +297,7 @@ namespace DBBackupLib
             return deleteTask;
         }
 
-        public static string DeleteFile(string gFileId)
+        public static string DeleteFile(string localFilePath, string gFileId)
         {
             IsDeletingFile = true;
             string deleteResult = "";
@@ -309,12 +314,14 @@ namespace DBBackupLib
             catch (Exception e)
             {
                 Debug.WriteLine("An error occurred: " + e.Message);
-                throw;
+                new Exception($"{localFilePath} could not be deleted from GDrive (Id: {gFileId})", e);
             }
             finally { IsDeletingFile = false; }
             service?.Dispose();
             return deleteResult;
         }
+
+
     }
 
 

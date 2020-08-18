@@ -50,7 +50,6 @@ namespace DBBackupLib
                     t.Start();
                 else if (t.Status == TaskStatus.Faulted || t.Status == TaskStatus.Canceled)
                     LoggerException = t.Exception;
-                    
         }
 
         public static async Task LogException(Exception exception) {
@@ -63,10 +62,12 @@ namespace DBBackupLib
         static async Task LogExceptionAsync(Exception exception) {
 
             string exceptionLog = exception.Message;
+            exceptionLog += "\n\t\t%%%%%%% Stack Trace %%%%%\n" + exception.StackTrace + "\n\t\t%%%%%% End of Stack Trace %%%%%%";
             while (exception.InnerException != null)
             {
-                exceptionLog += string.Format("\n\n\t\t*******Inner Exception********{0}\n\n\t\t*********End of Inner Exception********", exception.InnerException);
                 exception = exception.InnerException;
+                exceptionLog += string.Format("\n\n\t\t*******Inner Exception********{0}\n\n\t\t*********End of Inner Exception********", exception);
+                exceptionLog += "\n\t\t%%%%%%% Stack Trace %%%%%\n" + exception.StackTrace + "\n\t\t%%%%%% End of Stack Trace %%%%%%\n";
             }            
             try
             {

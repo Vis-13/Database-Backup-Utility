@@ -36,13 +36,12 @@ namespace DBBackupUtil
             MainViewModel = ServiceProvider.Get<MainViewModel>();
             DataContext = MainViewModel;
             ItemsControl = icCS;
-            Closed += MainWindow_Closed;
+            Closed += (Sender, Args) =>
+            {
+                MainViewModel.Dispose();                
+            };
         }
 
-        private void MainWindow_Closed(object sender, EventArgs e)
-        {
-            MainViewModel.Dispose();
-        }
 
         private void btnSelectFolder_Click(object sender, RoutedEventArgs e)
         {
@@ -92,14 +91,19 @@ namespace DBBackupUtil
 
         private void btnCancel_Click(object sender, RoutedEventArgs e)
         {
+            if (e != null)
+                e.Handled = true;
             MessageBoxResult msgResult = MessageBoxResult.None;
             if (MainViewModel.IsProcessing.Value)
             {
                 msgResult = System.Windows.MessageBox.Show("Taking a Backup. Do you want to close abruptly!", "Warning", MessageBoxButton.YesNo);
                 if (msgResult == MessageBoxResult.No)
+                {
                     return;
+                }
             }
-            Close();
+            SystemCommands.CloseWindow(this);
+            //Close();
         }
 
         //public void WaitForRecordingToFinish()
@@ -143,7 +147,8 @@ namespace DBBackupUtil
         // Close
         private void CommandBinding_Executed_Close(object sender, ExecutedRoutedEventArgs e)
         {
-            SystemCommands.CloseWindow(this);
+            e.Handled = true;
+            btnCancel_Click(sender, null);
         }
 
         // State change
