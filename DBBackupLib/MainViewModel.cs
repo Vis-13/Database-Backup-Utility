@@ -193,7 +193,7 @@ namespace DBBackupLib
                         {
                             backupTaskLog += "Could not find 'FileToDelete' object in the 'LastUploadedFiles'\n";
                         }
-                        fileToDelete.Dispose();
+                        fileToDelete?.Dispose();
                     }
                     cString.IsProcessing.Value = false;
                 }
@@ -232,7 +232,7 @@ namespace DBBackupLib
 
         void SaveFaultedUploadsList() {
             string jsonFaultedUploads = JsonConvert.SerializeObject(LatestUploadedFiles.Where(l => l.Result.IsFaulted).ToArray());
-            File.WriteAllText("Faulted Uploads - " + CurrentDateTimeString +  ".json", jsonFaultedUploads);
+            File.WriteAllText("Faulted Uploads - " + CurrentDateTimeString +  ".json", jsonFaultedUploads.Length <= "[]".Length ? "No faulted Uploads. Please check other logs!" : jsonFaultedUploads);
         }
 
 
