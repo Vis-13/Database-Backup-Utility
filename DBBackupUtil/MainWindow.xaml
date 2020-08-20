@@ -15,214 +15,7 @@
         <WindowChrome CaptionHeight="34" />
     </WindowChrome.WindowChrome>
     <Window.Resources>
-        <Style TargetType="Button">
-            <Setter Property="Background" Value="#fff"/>
-            <Setter Property="Foreground" Value="#000"/>
-            <Setter Property="FontSize" Value="15"/>
-            <Setter Property="Margin" Value="5"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="5" BorderThickness="1" Padding="5" BorderBrush="#000">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"></ContentPresenter>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="Gold"/>
-                    <Setter Property="Foreground" Value="#fff"/>
-                    <Setter Property="FontSize" Value="16"/>
-                    <Setter Property="FontWeight" Value="Bold"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-        <Style TargetType="Button" x:Key="btnGDriveList">
-            <Setter Property="Background" Value="#fff"/>
-            <Setter Property="Foreground" Value="#000"/>
-            <Setter Property="FontSize" Value="15"/>
-            <Setter Property="Padding" Value="5"/>
-            <Setter Property="Margin" Value="5"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="5" BorderThickness="1" Padding="5" BorderBrush="#000">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <ContentPresenter.ContentTemplate>
-                                    <DataTemplate>
-                                        <StackPanel x:Name="spUploadBtn" Background="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Background}">
-                                            <TextBlock x:Name="txtButtonContent" Text="{TemplateBinding Content}" Background="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Background}"></TextBlock>
-                                            <ProgressBar Name="pbUploadToGDrive" IsIndeterminate="{Binding MainViewModel.IsProcessing.Value, Source={StaticResource ServiceLocator}, Mode=OneWay}" Height="10" Width="175" Margin="0,2,0,2" ></ProgressBar>
-                                        </StackPanel>
-                                        <DataTemplate.Triggers>
-                                            <DataTrigger Binding="{Binding MainViewModel.IsProcessing.Value, Source={StaticResource ServiceLocator}}" Value="True">
-                                                <!-- define your triggered value here -->
-                                                <Setter TargetName="txtButtonContent" Property="Text" Value="Uploading To GDrive...." />
-                                            </DataTrigger>
-                                        </DataTemplate.Triggers>
-                                    </DataTemplate>
-                                </ContentPresenter.ContentTemplate>
-                            </ContentPresenter>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="#fff" />
-                </Trigger>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="Green"/>
-                    <Setter Property="Foreground" Value="#fff"/>
-                </Trigger>
-                <DataTrigger Binding="{Binding MainViewModel.IsProcessing.Value, Source={StaticResource ServiceLocator}}" Value="True">
-                    <DataTrigger.EnterActions>
-                        <StopStoryboard BeginStoryboardName="sbBackSucc"></StopStoryboard>
-                        <StopStoryboard BeginStoryboardName="sbHasEx"/>
-                        <BeginStoryboard x:Name="sbIsProcessing" >
-                            <Storyboard Storyboard.TargetProperty="(Background).(SolidColorBrush.Color)">
-                                <ColorAnimation From="Red" To="#fff" Duration="0:0:1" AutoReverse="True" RepeatBehavior="Forever" />
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </DataTrigger.EnterActions>
-                </DataTrigger>
-                <DataTrigger Binding="{Binding MainViewModel.HasExceptionOccuredWhileBackingup.Value, Source={StaticResource ServiceLocator}}" Value="True">
-                    <DataTrigger.EnterActions>
-                        <StopStoryboard BeginStoryboardName="sbIsProcessing"></StopStoryboard>
-                        <BeginStoryboard x:Name="sbHasEx">
-                            <Storyboard Storyboard.TargetProperty="(Background).(SolidColorBrush.Color)">
-                                <!--<ColorAnimation From="#fff" To="Red" Duration="0:0:3"/>-->
-                                <ColorAnimation From="Red" To="#fff" Duration="0:0:1" AutoReverse="True" RepeatBehavior="Forever" />
-                                <StringAnimationUsingKeyFrames Storyboard.TargetProperty="(Button.Content)" Duration="0:0:2" AutoReverse="True" RepeatBehavior="Forever">
-                                    <DiscreteStringKeyFrame Value="Error Uploading..." KeyTime="0:0:0" />
-                                    <DiscreteStringKeyFrame Value="Restart App if possible" KeyTime="0:0:1" />
-                                </StringAnimationUsingKeyFrames>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </DataTrigger.EnterActions>
-                    <DataTrigger.ExitActions>
-                        <StopStoryboard BeginStoryboardName="sbHasEx"></StopStoryboard>
-                    </DataTrigger.ExitActions>
-                </DataTrigger>
-                <DataTrigger Binding="{Binding MainViewModel.BackupUploadedSuccessfully.Value, Source={StaticResource ServiceLocator}}" Value="True">
-                    <DataTrigger.EnterActions>
-                        <StopStoryboard BeginStoryboardName="sbIsProcessing"></StopStoryboard>
-                        <StopStoryboard BeginStoryboardName="sbHasEx"></StopStoryboard>
-                        <BeginStoryboard x:Name="sbBackSucc">
-                            <Storyboard Storyboard.TargetProperty="(Background).(SolidColorBrush.Color)">
-                                <ColorAnimation From="Green" To="#fff" Duration="0:0:10"/>
-                                <StringAnimationUsingKeyFrames Storyboard.TargetProperty="(Button.Content)" Duration="0:0:4" AutoReverse="False" FillBehavior="Stop">
-                                    <!-- All the key frames below are DiscreteStringKeyFrames. Discrete key frames create 
-                sudden "jumps" between values (no interpolation). Only discrete key frames can be used 
-                for String key frame animations. -->
-                                    <DiscreteStringKeyFrame Value="Up" KeyTime="0:0:0" />
-                                    <DiscreteStringKeyFrame Value="Uploa" KeyTime="0:0:.5" />
-                                    <DiscreteStringKeyFrame Value="Uploading" KeyTime="0:0:1" />
-                                    <DiscreteStringKeyFrame Value="Uploading Succ" KeyTime="0:0:1.5" />
-                                    <DiscreteStringKeyFrame Value="Uploading Successfull!" KeyTime="0:0:2" />
-                                    <DiscreteStringKeyFrame Value="..." KeyTime="0:0:2.5" />
-                                    <DiscreteStringKeyFrame Value="......." KeyTime="0:0:3" />
-                                    <DiscreteStringKeyFrame Value="............." KeyTime="0:0:3.5" />
-                                    <!--<DiscreteStringKeyFrame Value="Start" KeyTime="0:0:3.5" />
-                                    <DiscreteStringKeyFrame Value="Start Up" KeyTime="0:0:4" />
-                                    <DiscreteStringKeyFrame Value="Start Uploadin" KeyTime="0:0:4.5" />
-                                    <DiscreteStringKeyFrame Value="Start Uploading To" KeyTime="0:0:5" />
-                                    <DiscreteStringKeyFrame Value="Start Uploading To G" KeyTime="0:0:5.5" />
-                                    <DiscreteStringKeyFrame Value="Start Uploading To GDrive" KeyTime="0:0:6" />-->
-                                </StringAnimationUsingKeyFrames>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </DataTrigger.EnterActions>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-        <Style TargetType="Button" x:Key="btnLightRed">
-            <Setter Property="Background" Value="#fff"/>
-            <Setter Property="Foreground" Value="#000"/>
-            <Setter Property="FontSize" Value="15"/>
-            <Setter Property="Margin" Value="5"/>
-            <Setter Property="Padding" Value="5"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="5" BorderThickness="1" Padding="5" BorderBrush="#000">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"></ContentPresenter>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="LightCoral"/>
-                    <Setter Property="Foreground" Value="#fff"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-        <Style TargetType="Button" x:Key="btnGray">
-            <Setter Property="Background" Value="#fff"/>
-            <Setter Property="Foreground" Value="#000"/>
-            <Setter Property="FontSize" Value="15"/>
-            <Setter Property="Margin" Value="5"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="5" BorderThickness="1" Padding="5" BorderBrush="#000">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"></ContentPresenter>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="DarkGray"/>
-                    <Setter Property="Foreground" Value="#fff"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-        <!--Base style for title bar buttons-->
-        <Style x:Key="CaptionButtonStyle" TargetType="Button">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Grid x:Name="LayoutRoot" Background="Transparent" Width="44" Height="30">
-                            <TextBlock x:Name="txt" Text="{TemplateBinding Content}" FontFamily="Segoe MDL2 Assets" FontSize="10" 
-                                   Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   RenderOptions.ClearTypeHint="Auto" TextOptions.TextRenderingMode="Aliased"  TextOptions.TextFormattingMode="Display"/>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="LayoutRoot" Property="Background" Value="#E5E5E5"/>
-                                <Setter TargetName="txt" Property="Foreground" Value="#000000"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        <!--Minimize-->
-        <Style x:Key="MinimizeButtonStyle" TargetType="Button" BasedOn="{StaticResource CaptionButtonStyle}">
-            <Setter Property="Content" Value="&#xE949;"/>
-        </Style>
-        <!--Maximize-->
-        <Style x:Key="MaximizeButtonStyle" TargetType="Button" BasedOn="{StaticResource CaptionButtonStyle}">
-            <Setter Property="Content" Value="&#xE739;"/>
-        </Style>
-        <!--Restore-->
-        <Style x:Key="RestoreButtonStyle" TargetType="Button" BasedOn="{StaticResource CaptionButtonStyle}">
-            <Setter Property="Content" Value="&#xE923;"/>
-        </Style>
-        <!--Close-->
-        <Style x:Key="CloseButtonStyle" TargetType="Button" BasedOn="{StaticResource CaptionButtonStyle}">
-            <Setter Property="Content" Value="&#xE106;"/>
-        </Style>
-        <Style TargetType="TextBox">
-            <Setter Property="VerticalAlignment" Value="Center"></Setter>
-            <Setter Property="MinWidth" Value="100"></Setter>
-            <Setter Property="MaxHeight" Value="40"></Setter>
-            <Setter Property="FontSize" Value="16"></Setter>
-            <Setter Property="FontWeight" Value="DemiBold"></Setter>
-        </Style>
+
     </Window.Resources>
     <!--Title bar button commands-->
     <Window.CommandBindings>
@@ -274,15 +67,17 @@
                             <ColumnDefinition Width="319*"/>
                         </Grid.ColumnDefinitions>
                         <Label Content="Database" HorizontalAlignment="Left" VerticalAlignment="Top" FontSize="20" FontWeight="DemiBold" Width="128" Height="38" Margin="0,23,0,0"/>
-                        <ScrollViewer x:Name="sv" Grid.Column="1" Margin="2,2,2,10" ScrollViewer.VerticalScrollBarVisibility="Visible" CanContentScroll="True">                            
-                            <ItemsControl x:Name="icCS" Margin="2,2,5,2" SelectiveScrollingGrid.SelectiveScrollingOrientation="Vertical">                                
-                                <ItemsControl.ItemsSource><Binding Path="MainViewModel.CStringsDBToBackup" Source="{StaticResource ServiceLocator}"/></ItemsControl.ItemsSource>                            
-                                <ItemsControl.ItemTemplate>                                    
+                        <ScrollViewer x:Name="sv" Grid.Column="1" Margin="2,2,2,10" ScrollViewer.VerticalScrollBarVisibility="Visible" CanContentScroll="True">
+                            <ItemsControl x:Name="icCS" Margin="2,2,5,2" SelectiveScrollingGrid.SelectiveScrollingOrientation="Vertical">
+                                <ItemsControl.ItemsSource>
+                                    <Binding Path="MainViewModel.CStringsDBToBackup" Source="{StaticResource ServiceLocator}"/>
+                                </ItemsControl.ItemsSource>
+                                <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel Margin="2,2,2,2">
                                             <i:Interaction.Behaviors>
                                                 <local:ScrollToBehavior IsProcessing="{Binding IsProcessing.Value}" />
-                                            </i:Interaction.Behaviors>                                            
+                                            </i:Interaction.Behaviors>
                                             <Grid Margin="5,0,0,0"  Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType={x:Type StackPanel}}}" HorizontalAlignment="Left" MinHeight="42" Height="44" >
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="95*"/>
@@ -291,7 +86,7 @@
                                                 </Grid.ColumnDefinitions>
                                                 <Border BorderThickness="3" BorderBrush="Blue" CornerRadius="5">
                                                     <TextBox x:Name="txtConnectionString" VerticalContentAlignment="Center" IsEnabled="{Binding IsProcessing.Value, Converter={StaticResource NegatingConverter}, NotifyOnTargetUpdated=True}" Text="{Binding SqlConnectionString, Mode=TwoWay}" SelectionBrush="#FFDADADA" FontSize="23" Height="42">
-                                                        </TextBox>
+                                                    </TextBox>
                                                     <Border.Style>
                                                         <Style>
                                                             <Style.Triggers>
@@ -299,7 +94,7 @@
                                                                     <Setter Property="local:ScrollToBehavior.IsProcessing" Value="True"/>
                                                                     <DataTrigger.EnterActions>
                                                                         <BeginStoryboard x:Name="sbCS">
-                                                                            <Storyboard Storyboard.TargetProperty="BorderBrush.Color">                                                                                
+                                                                            <Storyboard Storyboard.TargetProperty="BorderBrush.Color">
                                                                                 <ColorAnimation From="Red" To="#FF3AFF00" Duration="0:0:1" AutoReverse="True" RepeatBehavior="Forever" />
                                                                             </Storyboard>
                                                                         </BeginStoryboard>
@@ -308,8 +103,8 @@
                                                                         <StopStoryboard BeginStoryboardName="sbCS"></StopStoryboard>
                                                                     </DataTrigger.ExitActions>
                                                                 </DataTrigger>
-                                                                <DataTrigger Binding="{Binding HasErrors}" Value="True">                                                                    
-                                                                    <DataTrigger.EnterActions>                                                                        
+                                                                <DataTrigger Binding="{Binding HasErrors}" Value="True">
+                                                                    <DataTrigger.EnterActions>
                                                                         <StopStoryboard BeginStoryboardName="sbCS"></StopStoryboard>
                                                                         <BeginStoryboard x:Name="sbCSError">
                                                                             <Storyboard Storyboard.TargetProperty="BorderBrush.Color">
@@ -331,7 +126,7 @@
                                                 <Button x:Name="btnRemoveDatabase" Command="{Binding MainViewModel.RemoveConnectionStringCommand, Source={StaticResource ServiceLocator}}" CommandParameter="{Binding }" HorizontalAlignment="Left" Grid.Column="2" ToolTip="Remove Database from Backup List" Margin="5,0,0,0" Height="38">
                                                     <Path x:Name="pathRemoveDB" Width="20" Height="20" Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" Fill="Red" Stretch="Uniform" />
                                                 </Button>
-                                            </Grid>                                            
+                                            </Grid>
                                             <GridSplitter Height="1" Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType={x:Type StackPanel}}}" Margin="1,3,1,1" IsEnabled="False"/>
                                         </StackPanel>
                                     </DataTemplate>
@@ -341,9 +136,9 @@
                         <Label Grid.Row="1" Content="Backup Folder" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20" FontWeight="DemiBold" Width="138" Height="38"/>
                         <TextBox Grid.Row="1" x:Name="txtFolder" Grid.Column="1" VerticalContentAlignment="Center" Text="{Binding MainViewModel.BackupFolderPath, Mode=TwoWay, Source={StaticResource ServiceLocator}}" HorizontalAlignment="Left" Margin="10,0,0,0" Padding="2,0,0,2" FontSize="22" FontWeight="Bold" MinHeight="45" Height="46" Width="528"/>
                         <Button x:Name="btnSelectFolder" Content="Folder" Grid.Column="1" HorizontalAlignment="Left" Margin="543,0,0,0" Grid.Row="1" Width="90" Click="btnSelectFolder_Click" Height="40" VerticalAlignment="Center"/>
-                        <Button Content="Start Uploading To GDrive" x:Name="btnGDriveList" Style="{StaticResource btnGDriveList}"  Grid.Column="1" HorizontalAlignment="Left" Margin="69,6,0,0" Grid.Row="2" VerticalAlignment="Top" Height="40" Width="218" IsEnabled="{Binding MainViewModel.IsProcessing.Value, Converter={StaticResource NegatingConverter}, Mode=OneWay, NotifyOnTargetUpdated=True, Source={StaticResource ServiceLocator}}" 
+                        <Button Content="Start Uploading To GDrive" x:Name="btnGDriveList" Style="{StaticResource btnGDriveList}"  Grid.Column="1" HorizontalAlignment="Left" Margin="10,5,0,0" Grid.Row="2" VerticalAlignment="Top" Height="40" Width="218" IsEnabled="{Binding MainViewModel.IsProcessing.Value, Converter={StaticResource NegatingConverter}, Mode=OneWay, NotifyOnTargetUpdated=True, Source={StaticResource ServiceLocator}}" 
                             Command="{Binding MainViewModel.BackupCommand, Source={StaticResource ServiceLocator}}"/>
-                        <Button Content="Cancel" x:Name="btnCancel" Click="btnCancel_Click" Grid.Column="1" HorizontalAlignment="Left" Margin="304,6,0,0" Grid.Row="2" VerticalAlignment="Top" Height="40" Width="166"/>
+                        <Button Content="Cancel" x:Name="btnCancel" Click="btnCancel_Click" Grid.Column="1" HorizontalAlignment="Left" Margin="241,5,0,0" Grid.Row="2" VerticalAlignment="Top" Height="40" Width="166"/>
                         <StackPanel Grid.Row="2" Margin="0,5,10,5">
                             <TextBox x:Name="txtBackUpInterval" HorizontalAlignment="Left" TextAlignment="Center" VerticalContentAlignment="Center" Margin="10,0,0,0" FontSize="30" TextWrapping="Wrap" Width="94" Height="39" Text="{Binding MainViewModel.BackupIntervalInMins, Mode=TwoWay, Source={StaticResource ServiceLocator}, UpdateSourceTrigger=Explicit}" 
                                      IsEnabled="{Binding MainViewModel.IsProcessing.Value, Converter={StaticResource NegatingConverter}, Mode=OneWay, Source={StaticResource ServiceLocator}}">
@@ -354,9 +149,10 @@
                             <TextBlock Margin="10,2,5,0"><Run Foreground="Red" FontSize="10" FontWeight="Bold" Text="Backup interval :"/><LineBreak/>
                                 <InlineUIContainer><TextBlock Margin="10,0,0,0" Foreground="Red" FontSize="10" FontWeight="Bold" Text="{Binding MainViewModel.BackupIntervalInMins, Mode=TwoWay, Source={StaticResource ServiceLocator}}"/></InlineUIContainer><Run Text=" "/><Run Foreground="Red" FontSize="10" FontWeight="Bold" Text="minutes"/></TextBlock>
                         </StackPanel>
-                        <Button HorizontalAlignment="Left" Margin="31,65,0,0" Name="btnAddConnectionString" Click="btnAddConnectionString_Click" VerticalAlignment="Top" Width="32" Height="28">
+                        <Button HorizontalAlignment="Left" Margin="29,65,0,0" Name="btnAddConnectionString" Click="btnAddConnectionString_Click" VerticalAlignment="Top" Width="32" Height="28">
                             <Path Stretch="Fill" Fill="Red" Stroke="{x:Null}" StrokeThickness="3" Data="M3.875,0 L5.125,0 5.125,3.875 9,3.875 9,5.125 5.125,5.125 5.125,9 3.875,9 3.875,5.125 0,5.125 0,3.875 3.875,3.875 3.875,0 z" />
                         </Button>
+                        <!--<Button Content="Settings" Name="btnSettings" Click="btnSettings_Click" Grid.Column="1" HorizontalAlignment="Left" Margin="421,5,0,0" Grid.Row="2" VerticalAlignment="Top" Width="116" Height="40"/>-->
                     </Grid>
                 </Grid>
             </WrapPanel>

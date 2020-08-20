@@ -40,6 +40,12 @@ namespace DBBackupUtil
             {
                 MainViewModel.Dispose();                
             };
+            Activated += (sender, args) => { 
+
+            };
+            ContentRendered += (sender, args) => { 
+            
+            };
         }
 
 
@@ -179,6 +185,12 @@ namespace DBBackupUtil
             if(!string.IsNullOrWhiteSpace(cString))
                 CString.Add(cString);   
         }
+
+        private void btnSettings_Click(object sender, RoutedEventArgs e)
+        {
+            Settings settingsWindow = new Settings();
+            settingsWindow.ShowDialog();
+        }
     }
 
     public static class Extensions
@@ -256,15 +268,6 @@ namespace DBBackupUtil
             if (framework == null) { return; }
             framework.BringIntoView();
         }
-
-        //public void ScrollIntoView()
-        //{
-        //    ItemsControl control = (ItemsControl)this.AssociatedObject.TemplatedParent;
-        //    int count = control.Items.Count;
-        //    if (count == 0) { return; }
-        //    object item = control.Items[count - 1];
-        //    control.ScrollIntoView(item);
-        //}
 
     }
 

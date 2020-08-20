@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Markup;
+using Google;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Drive.v3;
 using Google.Apis.Drive.v3.Data;
@@ -29,6 +30,7 @@ namespace DBBackupLib
 
         public static bool IsUploadingFile { get; private set; }
         public static bool IsDeletingFile { get; private set; }
+        public static bool IsEmptyingTrash { get; private set; }
 
         /// a Valid authenticated DriveService
         /// The title of the file. Used to identify file or folder name.
@@ -314,13 +316,35 @@ namespace DBBackupLib
             catch (Exception e)
             {
                 Debug.WriteLine("An error occurred: " + e.Message);
-                new Exception($"{localFilePath} could not be deleted from GDrive (Id: {gFileId})", e);
+                throw new Exception($"{localFilePath} could not be deleted from GDrive (Id: {gFileId})", e);
             }
             finally { IsDeletingFile = false; }
             service?.Dispose();
             return deleteResult;
         }
 
+        public static string EmptyTrashFolder() {
+            IsEmptyingTrash = true;
+            string emptyTrashResult = "Error";
+            DriveService service = GetGDriveService();
+            try
+            {
+                FilesResource.EmptyTrashRequest emptyTrashRequest = service.Files.EmptyTrash();
+                emptyTrashResult = emptyTrashRequest.Execute();
+            }
+            catch (GoogleApiException e)
+            {
+                Debug.WriteLine("An error occurred: " + e.Message);
+                throw;
+            }
+            catch (Exception e) {
+                Debug.WriteLine("An error occurred: " + e.Message);
+                throw;
+            }
+            finally { IsEmptyingTrash = false; }
+            service?.Dispose();
+            return emptyTrashResult;
+        }
 
     }
 

@@ -109,6 +109,7 @@ namespace DBBackupLib
             if (indexOfLogNo == -1)
             {
                 fs.Seek(-noOfBytesRead, SeekOrigin.Current);
+                fs.ReadTimeout = 1000 * 60;
                 return GetLastLogNumberFromLogFile(fs).Result;
             }
             char cNo;
