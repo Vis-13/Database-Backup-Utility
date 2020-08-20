@@ -27,10 +27,12 @@ namespace DBBackupLib
         static string ApplicationName = "Backup Database";
         static string FileUploadDescription = "File uploaded by Golden Backup Utility";
         static string UploadIdKey = "UpId";
+        public const string GFolderId = "18-wjFxMidgdy9eJbZSY1xCtPIYR8cDgI";
 
         public static bool IsUploadingFile { get; private set; }
         public static bool IsDeletingFile { get; private set; }
         public static bool IsEmptyingTrash { get; private set; }
+        public static bool IsListingFileWithFilter { get; private set; }
 
         /// a Valid authenticated DriveService
         /// The title of the file. Used to identify file or folder name.
@@ -202,7 +204,7 @@ namespace DBBackupLib
                 body.Description = FileUploadDescription;
                 body.Properties = appFileAttributes;
                 body.MimeType = GetMimeType(uploadFile);
-                body.Parents = new List<string>(new[] { "18-wjFxMidgdy9eJbZSY1xCtPIYR8cDgI" });
+                body.Parents = new List<string>(new[] { GFolderId });
                 //body.Parents.Add(/*"Golden Database Backup(18 - */"wjFxMidgdy9eJbZSY1xCtPIYR8cDgI");
                 try
                 {
@@ -346,6 +348,33 @@ namespace DBBackupLib
             return emptyTrashResult;
         }
 
+        public static FileList GetYesterdaysFiles(string filter) {
+            IsListingFileWithFilter = true;
+            DriveService service = GetGDriveService();
+            FileList files = null;
+            try
+            {
+                FilesResource.ListRequest listRequest = service.Files.List();
+                DateTime ct = DateTime.Now;
+                //ct = ct.TimeOfDay.TotalMinutes < 5 ? ct.AddDays(-1).Date : ct;
+                listRequest.Q = filter;
+                listRequest.Fields = "files(id, parents, name, createdTime, modifiedTime)";
+                files = listRequest.Execute();
+            }
+            catch (GoogleApiException e)
+            {
+                Debug.WriteLine("An error occurred: " + e.Message);
+                throw;
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine("An error occurred: " + e.Message);
+                throw;
+            }
+            finally { IsListingFileWithFilter = false; }
+            service?.Dispose();
+            return files;
+        }
     }
 
 

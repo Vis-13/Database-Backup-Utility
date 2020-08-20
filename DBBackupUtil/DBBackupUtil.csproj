@@ -7,6 +7,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="DialogExample.xaml.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Page Remove="DialogExample.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="com.rusanu.dataconnectiondialog" Version="1.0.0.1" />
     <PackageReference Include="Microsoft.UI.Xaml" Version="2.4.3" />
     <PackageReference Include="System.Data.SqlClient" Version="4.8.2" />

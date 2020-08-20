@@ -8,6 +8,7 @@
     <Application.Resources>
         <BackupLib:ServiceLocator x:Key="ServiceLocator"/>
         <BackupLib:NegatingConverter x:Key="NegatingConverter"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         <!--<XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />-->
         <!--Base style for title bar buttons-->
         <Style x:Key="CaptionButtonStyle" TargetType="Button">
@@ -143,9 +144,7 @@
                             <Storyboard Storyboard.TargetProperty="(Background).(SolidColorBrush.Color)">
                                 <ColorAnimation From="Green" To="#fff" Duration="0:0:10"/>
                                 <StringAnimationUsingKeyFrames Storyboard.TargetProperty="(Button.Content)" Duration="0:0:4" AutoReverse="False" FillBehavior="Stop">
-                                    <!-- All the key frames below are DiscreteStringKeyFrames. Discrete key frames create 
-                sudden "jumps" between values (no interpolation). Only discrete key frames can be used 
-                for String key frame animations. -->
+                                    <!-- All the key frames below are DiscreteStringKeyFrames. Discrete key frames create sudden "jumps" between values (no interpolation). Only discrete key frames can be used for String key frame animations. -->
                                     <DiscreteStringKeyFrame Value="Up" KeyTime="0:0:0" />
                                     <DiscreteStringKeyFrame Value="Uploa" KeyTime="0:0:.5" />
                                     <DiscreteStringKeyFrame Value="Uploading" KeyTime="0:0:1" />
@@ -154,17 +153,11 @@
                                     <DiscreteStringKeyFrame Value="..." KeyTime="0:0:2.5" />
                                     <DiscreteStringKeyFrame Value="......." KeyTime="0:0:3" />
                                     <DiscreteStringKeyFrame Value="............." KeyTime="0:0:3.5" />
-                                    <!--<DiscreteStringKeyFrame Value="Start" KeyTime="0:0:3.5" />
-                                    <DiscreteStringKeyFrame Value="Start Up" KeyTime="0:0:4" />
-                                    <DiscreteStringKeyFrame Value="Start Uploadin" KeyTime="0:0:4.5" />
-                                    <DiscreteStringKeyFrame Value="Start Uploading To" KeyTime="0:0:5" />
-                                    <DiscreteStringKeyFrame Value="Start Uploading To G" KeyTime="0:0:5.5" />
-                                    <DiscreteStringKeyFrame Value="Start Uploading To GDrive" KeyTime="0:0:6" />-->
                                 </StringAnimationUsingKeyFrames>
                             </Storyboard>
                         </BeginStoryboard>
                     </DataTrigger.EnterActions>
-                </DataTrigger>
+                </DataTrigger>                
             </Style.Triggers>
         </Style>
         <Style TargetType="Button" x:Key="btnLightRed">

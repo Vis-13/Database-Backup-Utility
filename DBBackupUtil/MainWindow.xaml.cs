@@ -191,27 +191,30 @@ namespace DBBackupUtil
             Settings settingsWindow = new Settings();
             settingsWindow.ShowDialog();
         }
-    }
 
-    public static class Extensions
-    {
-        public static void ScrollIntoView(
-            this ItemsControl control,
-            object item)
+        private void btnCleanLocalAndGDrive_Click(object sender, RoutedEventArgs e)
         {
-            FrameworkElement framework =
-                control.ItemContainerGenerator.ContainerFromItem(item)
-                as FrameworkElement;
-            if (framework == null) { return; }
-            framework.BringIntoView();
+            //DialogExample dialogExample = new DialogExample();
+            //dialogExample.Show();
+            OpenMbox_Clicked(sender, e);
         }
-        
-        public static void ScrollIntoView(this ItemsControl control)
+
+
+        private void OpenMbox_Clicked(object sender, RoutedEventArgs e)
         {
-            int count = control.Items.Count;
-            if (count == 0) { return; }
-            object item = control.Items[count - 1];
-            control.ScrollIntoView(item);
+            DialogReplacement.Visibility = System.Windows.Visibility.Visible;
+        }
+
+
+        private void mbox_ok(object sender, RoutedEventArgs e)
+        {
+            DialogReplacement.Visibility = System.Windows.Visibility.Collapsed;
+        }
+
+
+        private void mbox_cancel(object sender, RoutedEventArgs e)
+        {
+            DialogReplacement.Visibility = System.Windows.Visibility.Collapsed;
         }
     }
 

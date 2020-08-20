@@ -12,6 +12,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Data.Common;
 using System.Data.SqlClient;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -35,6 +36,7 @@ namespace DBBackupLib
 
         public string DeleteLocalAndGDriveBackupFilesLogFile { get; private set; } = "DeleteBackupFilesErroLog.txt";
 
+        public const int DeleteLocalAndGDriveFilesIntervalInMins = 5;
         string _cstringDBToBackup = "Data Source=.;Initial Catalog=gfunjoker;Integrated Security=True";
         public string CStringDBToBackup { get { return _cstringDBToBackup; } set { Set(ref _cstringDBToBackup, value); } }
 
@@ -68,8 +70,10 @@ namespace DBBackupLib
 
         public ICommand UpdateConnectionStringCommand { get; }
 
+        public ICommand CleanUpLocalAndGDriveCommand { get; }
+
         public string CurrentDateTimeString { get { return DateTime.Now.ToString("dd-MM-yyyy_HH-mm-ss"); } }
-        
+
         public string CurrentDTFileAppend { get { return DateTime.Now.ToString("dd-HH-mm-ss"); } }// day, mins, secs
 
         public ReactiveProperty<bool> HasExceptionOccuredWhileBackingup { get; private set; } = new ReactiveProperty<bool>(false);
@@ -88,18 +92,23 @@ namespace DBBackupLib
 
         ObservableCollection<FileToUpload> RecentFilesToUpload = new ObservableCollection<FileToUpload>();
 
+
+        bool _isDeletingPreviousHoursBackupFiles = false;
+        public bool IsDeletingPreviousHoursBackupFiles { get { return _isDeletingPreviousHoursBackupFiles; } set { Set(ref _isDeletingPreviousHoursBackupFiles, value); } }
+
         public MainViewModel() {
-            string exFilename = Logger.ExceptionLogFilename;
+            string exFilename = Logger.ExceptionLogFilename;            
             _backupFolderPath = ServiceProvider.TempBackupDir;
-            Task.Run(() =>  DeleteYesterdaysLogs(_backupFolderPath));
+            Task.Run(() => DeleteYesterdaysFiles(_backupFolderPath, DateTime.Now.AddDays(-1)));
             BackupCommand = new[] { IsProcessing, HasExceptionOccuredWhileBackingup }.CombineLatest(M => !M[0] && !M[1]).ToReactiveCommand().WithSubscribe(StartDatabaseBackup);
             SetBackupIntervalCommand = new[] { IsProcessing }.CombineLatest(M => !M[0]).ToReactiveCommand<string>().WithSubscribe(SetBackupInervals);
             RemoveConnectionStringCommand = new[] { IsProcessing }.CombineLatest(M => !M[0]).ToReactiveCommand<CString>().WithSubscribe(RemoveConnectionString);
             AddConnectionStringCommand = new[] { IsProcessing }.CombineLatest(M => !M[0]).ToReactiveCommand<string>().WithSubscribe(AddConnectionString);
+            CleanUpLocalAndGDriveCommand = new[] { IsProcessing }.CombineLatest(M => !M[0]).ToReactiveCommand().WithSubscribe(() => Last5DeleteFilesTimer(false));
             CStringsDBToBackup = CString.AddInit(true);
             _fileAppAttributes.Add("UpId", "");
-            Task.Run(() => LastUploadedFiles = FileToUpload.GetFileToUploadListFromSettings());
-            GoogleApis.ListFiles();
+            Task.Run(() => LastUploadedFiles = FileToUpload.GetFileToUploadListFromSettings());            
+            Task.Run(() => Last5DeleteFilesTimer(null));
         }
 
         //public void UploadFile(string tempFilePath, string currentTimeString, string databaseName) {
@@ -147,9 +156,14 @@ namespace DBBackupLib
         }
 
         public void BackUpDatabase() {
+
+            //while (IsDeletingLastHoursBackupFiles) { 
+            //    Thread.Sleep(1000);
+            //    System.Windows.Forms.Application.DoEvents();
+            //}
             HasExceptionOccuredWhileBackingup.Value = false;
             BackupUploadedSuccessfully.Value = false;
-            IsProcessing.Value = true;           
+            IsProcessing.Value = true;
             //LastBackupExceptionMsg.Value = "";
             CurrentGDriveUploadId = DateTime.Now.ToString("dd-HH:mm:ss.fffff");
             _fileAppAttributes["UpId"] = CurrentGDriveUploadId;
@@ -195,9 +209,8 @@ namespace DBBackupLib
                         else if (ftu.IsZipUploaded)
                         {
                             backupTaskLog += $"Uploaded file {ftu.LocalFilePath} to gdrive with Id: {ftu.UploadedFileId}!\n";
-
                         }
-                        lock(RecentFilesToUpload)
+                        lock (RecentFilesToUpload)
                             RecentFilesToUpload.Add(ftu);
                     }
                     cString.IsProcessing.Value = false;
@@ -210,58 +223,40 @@ namespace DBBackupLib
                     SetException(ex);
                 }
                 finally {
-                    FileToUpload fileToDelete = ftu.Find(LastUploadedFiles);
-                    if (fileToDelete != null)
-                    {
-                        //fileToDelete.DeleteFromGDrive(cString);
-                        //backupTaskLog += $"Deleting previous GDrive File {fileToDelete.LocalFilePath}. GDrive File Id: {fileToDelete.UploadedFileId}.\n";
-                    }
-                    else
-                    {
-                        backupTaskLog += "Could not find 'FileToDelete' object in the 'LastUploadedFiles'\n";
-                    }
-                    //if (fileToDelete != null) {
-                    //    fileToDelete.DeleteFromGDriveTask.ContinueWith(t => {
-                    //        string pf = $"Previous {Path.GetFileName(fileToDelete.LocalFilePath)} ";
-                    //        if (t.IsFaulted || !fileToDelete.IsGDriveZipDeleted)
-                    //            backupTaskLog += pf + $"GDrive file ({fileToDelete.UploadedFileId}) could not be delete...." + (t.IsFaulted ? $"Error:\n{fileToDelete.Error.ToString()}\n\n" : "\n");
-                    //        else
-                    //            backupTaskLog += pf + $" ({fileToDelete.UploadedFileId}) deleted on GDrive!\n";
-                    //    }).Wait();
-                        //fileToDelete.Dispose();
-                    //}
                     backupTaskLog1 = string.Format(backupTaskLog1, backupTaskLog + $"\n******** Log for { SelectedCStringDBToBackup.Database }" + " Ends *************\n\n{0}");
-                    Task.Run(DeleteLastBackedUpFilesOnLocalAndGDrive).Wait(10);
                 }
-            IsProcessing.Value = false;            
+            IsProcessing.Value = false;
             if (!HasExceptionOccuredWhileBackingup.Value)
             {
                 BackupUploadedSuccessfully.Value = true;
                 LastUploadedFiles = LatestUploadedFiles.Select(lt => lt.Result).ToList();
                 LatestUploadedFiles = new ObservableCollection<Task<FileToUpload>>();
-                Task t = Task.Run(() => GoogleApis.EmptyTrashFolder());
                 string backupTaskLogToWrite = backupTaskLog1;
-                t.ContinueWith(t => { if (t.IsFaulted) backupTaskLogToWrite = string.Format(backupTaskLogToWrite, t.Exception); 
-                    File.AppendAllText(BackupLogFile, backupTaskLogToWrite); });
+                //t.ContinueWith(t => { if (t.IsFaulted) backupTaskLogToWrite = string.Format(backupTaskLogToWrite, t.Exception); 
+                //    File.AppendAllText(BackupLogFile, backupTaskLogToWrite); });
+                lock (RecentFilesToUpload)
+                    File.AppendAllText(BackupLogFile, backupTaskLogToWrite);
             }
             else
             {
                 SaveFaultedUploadsList();
             }
-            
+            IsDeletingPreviousHoursBackupFiles = true;
+            Task.Run(DeleteLastBackedUpFilesOnLocalAndGDrive).Wait(10);
         }
 
         void SetException(Exception ex) {
             IsProcessing.Value = false;
             HasExceptionOccuredWhileBackingup.Value = true;
             BackupUploadedSuccessfully.Value = false;
+            File.WriteAllText("LastException.txt", ex.ToString());
             Logger.LogException(ex);
             LastBackupExceptionMsg.Value = "There was an error Backing Up the Database to GDrive. Please check the logs!";
         }
 
         void SaveFaultedUploadsList() {
             string jsonFaultedUploads = JsonConvert.SerializeObject(LatestUploadedFiles.Where(l => l.Result.IsFaulted).ToArray());
-            File.WriteAllText("Faulted Uploads - " + CurrentDateTimeString +  ".json", jsonFaultedUploads.Length <= "[]".Length ? "No faulted Uploads. Please check other logs!" : jsonFaultedUploads);
+            File.WriteAllText("Faulted Uploads - " + CurrentDateTimeString + ".json", jsonFaultedUploads.Length <= "[]".Length ? "No faulted Uploads. Please check other logs!" : jsonFaultedUploads);
         }
 
         Timer _timer = null;
@@ -288,32 +283,40 @@ namespace DBBackupLib
         }
 
         public bool IsInScheduledHours() {
-            return (DateTime.Now.Hour >= 7 && DateTime.Now.AddSeconds(-2).Hour < 23);                
+            return (DateTime.Now.Hour >= 0 && DateTime.Now.AddSeconds(-2).Hour < 24);
         }
 
-        bool _isCheckingLastBackedupFilesToDelete;
-        public bool IsCheckingLastBackedupFilesToDelete { get { return _isCheckingLastBackedupFilesToDelete; } private set { Set(ref _isCheckingLastBackedupFilesToDelete, value); } }
-        
-        Timer _last5DeleteFilesTimer = null;
         public void DeleteLastBackedUpFilesOnLocalAndGDrive() {
-            lock (RecentFilesToUpload) {                
-                IsCheckingLastBackedupFilesToDelete = true;
-                List<FileToUpload> fileToUploads = RecentFilesToUpload.Where(rft => rft.IsZipUploaded && rft.CreatedOn <= DateTime.Now.Subtract(TimeSpan.FromHours(1))).ToList();//.OrderBy(o => o.CreatedOn).Take(5).ToList();
-                fileToUploads.ForEach(f => DeleteLocalAndGDriveFile(f));
+            try
+            {
+                IsDeletingPreviousHoursBackupFiles = true;
+                lock (RecentFilesToUpload)
+                {
+                    List<FileToUpload> filesToUpload = RecentFilesToUpload.Where(rft => rft.IsZipUploaded && rft.CreatedOn <= DateTime.Now.Subtract(TimeSpan.FromMinutes(DeleteLocalAndGDriveFilesIntervalInMins))).ToList();//.OrderBy(o => o.CreatedOn).Take(5).ToList();
+                    filesToUpload.ForEach(f => { DeleteLocalAndGDriveFile(f); RecentFilesToUpload.Remove(f); });
+                }
+                Task<string> t = null;
+                (t = Task.Run(() => GoogleApis.EmptyTrashFolder()).ContinueWith(t => { IsDeletingPreviousHoursBackupFiles = false; return t.Result; })).Wait(1);
             }
+            catch (Exception ex)
+            {
+                IsDeletingPreviousHoursBackupFiles = false;
+                throw;
+            }            
         }
 
         public void DeleteLocalAndGDriveFile(FileToUpload fileToUpload) {
             string logChars = $"!@~{DateTime.Now} : {{0}}#$%\n";
+            string deleteLocalAndGDriveBackupFilesLog = "";
             try
             {
                 if (string.IsNullOrWhiteSpace(fileToUpload.LocalFilePath) || string.IsNullOrWhiteSpace(fileToUpload.UploadedFileId))
-                    File.AppendAllText(DeleteLocalAndGDriveBackupFilesLogFile, string.Format(logChars, $"Local or GDrive file path not found -> Local: {fileToUpload.LocalFilePath}\t GDrive: {fileToUpload.UploadedFileId}\n"));
+                    deleteLocalAndGDriveBackupFilesLog += string.Format(logChars, $"Local or GDrive file path not found -> Local: {fileToUpload.LocalFilePath}\t GDrive: {fileToUpload.UploadedFileId}\n{{0}}");
 
                 if (!File.Exists(fileToUpload.LocalFilePath))
-                    File.AppendAllText(DeleteLocalAndGDriveBackupFilesLogFile, string.Format(logChars, $"File not found: {fileToUpload.LocalFilePath}\n"));
+                    deleteLocalAndGDriveBackupFilesLog += string.Format(logChars, $"File not found: {fileToUpload.LocalFilePath}\n{{0}}");
                 else
-                    Task.Run(() => { try { fileToUpload.DeleteFromLocal(); } catch (Exception ex) { File.AppendAllText(DeleteLocalAndGDriveBackupFilesLogFile, string.Format(logChars, "\n" + ex + "\n\n")); } })
+                    Task.Run(() => { try { fileToUpload.DeleteFromLocal(); } catch (Exception ex) { deleteLocalAndGDriveBackupFilesLog += string.Format(logChars, "\n" + ex + "\n\n{{0}}"); } })
                         .Wait(10);
                 //string deleteFromGDriveResult = "";
                 if (!fileToUpload.IsGDriveZipDeleted)
@@ -322,35 +325,137 @@ namespace DBBackupLib
                     fileToUpload.DeleteFromGDriveTask.ContinueWith(t =>
                     {
                         if (t.IsFaulted)
-                            File.AppendAllText(DeleteLocalAndGDriveBackupFilesLogFile, string.Format(logChars, $"Error: {fileToUpload.Error}\n\n"));
+                            deleteLocalAndGDriveBackupFilesLog += string.Format(logChars, $"Error: {fileToUpload.Error}\n\n{{0}}");
                         if (!string.IsNullOrWhiteSpace(t.Result))
-                            File.AppendAllText(DeleteLocalAndGDriveBackupFilesLogFile, string.Format(logChars, $"Error: {t.Result}\n\n"));
+                            deleteLocalAndGDriveBackupFilesLog += string.Format(logChars, $"Error: {t.Result}\n\n{{0}}");
+                        else
+                            lock (RecentFilesToUpload)
+                                File.AppendAllText(BackupLogFile, string.Format(logChars, $"GDrive file: {Path.GetFileName(fileToUpload.LocalFilePath)}, Id: {fileToUpload.UploadedFileId} deleted successfully!\n{{0}}"));
+                        if (!string.IsNullOrWhiteSpace(deleteLocalAndGDriveBackupFilesLog))
+                            File.AppendAllText(DeleteLocalAndGDriveBackupFilesLogFile, deleteLocalAndGDriveBackupFilesLog);
+
                     }).Wait(100);
                 }
                 else
                 {
-                    File.AppendAllText(DeleteLocalAndGDriveBackupFilesLogFile, string.Format(logChars, $"File not found: {fileToUpload.LocalFilePath}\n"));
+                    deleteLocalAndGDriveBackupFilesLog += string.Format(logChars, $"GDrive file: {fileToUpload.UploadedFileId} already deleted!\n{{0}}");
                 }
             }
             catch (Exception ex) {
                 File.AppendAllText(DeleteLocalAndGDriveBackupFilesLogFile, string.Format(logChars, "\n" + ex + "\n\n"));
             }
+            if (!string.IsNullOrWhiteSpace(deleteLocalAndGDriveBackupFilesLog))
+                File.AppendAllText(DeleteLocalAndGDriveBackupFilesLogFile, deleteLocalAndGDriveBackupFilesLog);
+            //lock (RecentFilesToUpload)            
+            //    File.AppendAllText(BackupLogFile, );
         }
 
-        public static void DeleteYesterdaysLogs(string pathToDeleteContaintsOfYesterday)
+        public static void DeleteYesterdaysFiles(string pathToDeleteContaintsOfYesterday, DateTime? timeBeforeWhichToDelete = null)
         {
-            IEnumerable<string> directoriesDeleted = Directory.GetDirectories(pathToDeleteContaintsOfYesterday).Where(d => Directory.GetCreationTime(d) < DateTime.Now.Date)
+            timeBeforeWhichToDelete = timeBeforeWhichToDelete.HasValue ? timeBeforeWhichToDelete : DateTime.Now.Date;
+            IEnumerable<string> directoriesDeleted = Directory.GetDirectories(pathToDeleteContaintsOfYesterday).Where(d => Directory.GetCreationTime(d) < timeBeforeWhichToDelete)
                 .Select(dirname => { Directory.Delete(dirname, true); return dirname; }).ToList();
-            IEnumerable<string> files = Directory.GetFiles(pathToDeleteContaintsOfYesterday).Where(f => File.GetCreationTime(f) < DateTime.Now.Date)
+            IEnumerable<string> files = Directory.GetFiles(pathToDeleteContaintsOfYesterday, "*_backup_*.zip").Where(f => File.GetCreationTime(f) < DateTime.Now.Date)
                 .Select(filename => { File.Delete(filename); return filename; }).ToList();
             //File.WriteAllText()
+        }
+
+        public void DeleteYesterdaysLocalAndGDriveFilesIfNotNeeded(DateTime? logStartTime =null) {
+            //($"createdTime < '{DateTime.Now.AddDays(-1).Date.ToString("yyyy-MM-dd")}' and {GFolderId} in parents");
+            IsDeletingPreviousHoursBackupFiles = true;
+            try
+            {
+                logStartTime = logStartTime.HasValue ? logStartTime : DateTime.Now;
+                string logChars = $"!@~{logStartTime} : {{0}}#$%\n";
+                string errorLog = "";
+                string backupLog = "";
+                Task.Run(() =>
+                {
+                    try { DeleteYesterdaysFiles(BackupFolderPath, DateTime.Now.AddHours(-12)); backupLog += string.Format(logChars, $"'DeleteYesterdaysFiles(BackupFolderPath....)' called to delete older files in {BackupFolderPath}"); }
+                    catch (Exception ex) { errorLog += string.Format(logChars, $"Error deleting in 'DeleteYesterdaysFiles(BackupFolderPath....)'\n{ex}\n\n{{0}}"); }
+                }).Wait(10);
+                List<Task<string>> deleteTasks = new List<Task<string>>();
+                Google.Apis.Drive.v3.Data.FileList fileList = GoogleApis.GetYesterdaysFiles($"'{GoogleApis.GFolderId}' in parents");
+                foreach (CString cString in CString.CSStrings)
+                {
+                    List<Google.Apis.Drive.v3.Data.File> filesOfYesterday = fileList.Files.Where(f => f.Name.Contains(cString.Database + "_backup_") && f.CreatedTime < DateTime.Now.AddHours(-1)).ToList();
+                    int todaysFileCount = fileList.Files.Where(f => f.Name.Contains(cString.Database + "_backup_") && f.CreatedTime >= DateTime.Now.AddHours(-1)).Count();
+                    if (todaysFileCount > 5)
+                        foreach (Google.Apis.Drive.v3.Data.File fileOfYesterday in filesOfYesterday)
+                        {
+                            Task<string> t = Task.Run(() => GoogleApis.DeleteFile(cString.Database, fileOfYesterday.Id)).ContinueWith(t =>
+                            {
+                                string filenameIdString = $" : yesterdays file({fileOfYesterday.Name}, Id: {fileOfYesterday.Id})";
+                                string result = "Error";
+                                if (t.IsFaulted)
+                                    errorLog += string.Format(logChars, cString.Database + $"{filenameIdString} could not be delete. Please check on Gdrive.\n{{0}}");
+                                else if (t.IsCanceled)
+                                    errorLog += string.Format(logChars, cString.Database + $"{filenameIdString} could not be delete. The task was canceled. Please check on Gdrive.\n{{0}}");
+                                else
+                                {
+                                    backupLog += string.Format(logChars, cString.Database + $"{filenameIdString} created on {fileOfYesterday.CreatedTime} deleted Successfully.\n{{0}}");
+                                    result = t.Result;
+                                }
+                                return result;
+                            });
+                            t.Wait(1);
+                            deleteTasks.Add(t);
+                        }
+                }
+                deleteTasks.ForEach(t => { if (!t.IsCompleted) t.Wait(); });
+                if (!string.IsNullOrWhiteSpace(errorLog))
+                    File.AppendAllText("DeleteYesterdaysLocalAndGDriveFilesIfNotNeededErrorLogs.txt", errorLog);
+                if (!string.IsNullOrWhiteSpace(backupLog))
+                    lock (RecentFilesToUpload)
+                        File.AppendAllText(BackupLogFile, backupLog);
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+            finally {
+                int noOfSecsToCloseCleanUpDialog = 12*1000;
+                Thread.Sleep((noOfSecsToCloseCleanUpDialog - cleanUpStopWatch.ElapsedMilliseconds > 1000) ? noOfSecsToCloseCleanUpDialog - (int)cleanUpStopWatch.ElapsedMilliseconds : 0);
+                cleanUpStopWatch.Stop();
+                IsDeletingPreviousHoursBackupFiles = false;                
+            }
+        }
+
+        Timer _last5DeleteFilesTimer = null;
+        public DateTime Last5CleanUpStartTime { get; private set; } = DateTime.MinValue;
+        public DateTime Last5CleanUpEndTime { get; private set; } = DateTime.MinValue;
+        public const string Last5CleanUpLogFile = "Last5CleanUp.txt";
+        Stopwatch cleanUpStopWatch = new Stopwatch();
+        private void Last5DeleteFilesTimer(object restartTimmer)
+        {
+            if (_last5DeleteFilesTimer == null)
+                _last5DeleteFilesTimer = new Timer(Last5DeleteFilesTimer, true, (int)TimeSpan.FromHours(1).TotalMilliseconds, Timeout.Infinite);
+            else if(restartTimmer is bool && (bool)restartTimmer)
+            {
+                bool hasTimerDurationChanged = _last5DeleteFilesTimer.Change((int)TimeSpan.FromHours(1).TotalMilliseconds, Timeout.Infinite);
+            }
+            Last5CleanUpStartTime = DateTime.Now;
+            string logChars = $"!@~{Last5CleanUpStartTime} : {{0}}#$%\n";
+            while (IsProcessing.Value)
+                Thread.Sleep(1000);
+            try
+            {
+                cleanUpStopWatch.Restart();
+                DeleteYesterdaysLocalAndGDriveFilesIfNotNeeded();
+                Last5CleanUpEndTime = DateTime.Now;
+                File.AppendAllText(Last5CleanUpLogFile, string.Format(logChars, $"\nLast 5 clean up started.... ended at {Last5CleanUpEndTime}\n"));                
+                
+            } catch (Exception ex) {
+                File.AppendAllText(Last5CleanUpLogFile, string.Format(logChars, $"\nLast 5 clean up started.... errored: \n{ex}\n\n"));
+                Last5CleanUpEndTime = DateTime.Now;
+            }           
         }
 
         public void Dispose()
         {
             FileToUpload.SaveFileToUploadList(LastUploadedFiles);
         }
-    
+
     }
 
     public class NotifyPropertyChanged : INotifyPropertyChanged
@@ -397,7 +502,7 @@ namespace DBBackupLib
     }
 
     public class CString : NotifyPropertyChanged {
-        
+
         public static int CurrentIndex { get; private set; }
 
         public const string ICString = "Initial Catalog=";
@@ -408,7 +513,7 @@ namespace DBBackupLib
         public ReactiveProperty<bool> IsProcessing { get; set; } = new ReactiveProperty<bool>(false);
 
         bool _hasErrors = false;
-        public bool HasErrors { get { return _hasErrors; } set { 
+        public bool HasErrors { get { return _hasErrors; } set {
                 Set(ref _hasErrors, value); } }
 
         string _sqlConnectionString = "";
@@ -429,10 +534,10 @@ namespace DBBackupLib
         }
 
         public static void SetDatabaseFromConnectionString(CString cString) {
-            cString.Database = GetDatabaseFromConnectionString(cString.Database);           
+            cString.Database = GetDatabaseFromConnectionString(cString.Database);
         }
 
-        public static string GetDatabaseFromConnectionString(string  cs) {
+        public static string GetDatabaseFromConnectionString(string cs) {
             int idx = cs.IndexOf(ICString);
             string database = "";
             for (int i = 0; cs[idx + ICString.Length + i] != ';'; i++)
@@ -441,7 +546,7 @@ namespace DBBackupLib
         }
 
         public static ObservableCollection<CString> AddInit(bool shouldClearFirst = false) {
-            if(shouldClearFirst)
+            if (shouldClearFirst)
                 CSStrings.Clear();
             Add("Data Source=.;Initial Catalog=gfunjoker;Integrated Security=True");
             Add("Data Source=.;Initial Catalog=AdventureWorks2012;Integrated Security=True");
@@ -454,7 +559,7 @@ namespace DBBackupLib
         public static void RemoveAll() {
             CSStrings.Clear();
         }
-    
+
     }
 
     public class FileToUpload : NotifyPropertyChanged, IDisposable {
@@ -503,7 +608,7 @@ namespace DBBackupLib
             eFileStatus = FileStatus.CreatingZip;
             CreatedOn = DateTime.Now;
             CurrentGDriveUploadId = CreatedOn.ToString("dd-HH:mm:ss.fffff");
-            _fileAppAttributes.Add("UpId", CurrentGDriveUploadId);       
+            _fileAppAttributes.Add("UpId", CurrentGDriveUploadId);
         }
 
         public static async Task<FileToUpload> UploadFile(string tempBackupFolderPath, CString cString, string createZipFilename)
@@ -512,7 +617,7 @@ namespace DBBackupLib
             fileToUpload._cString = cString;
             fileToUpload.DatabaseToBackUp = cString.SqlConnectionString;
             int lastIndexOfPassword = -1;
-            if((lastIndexOfPassword = cString.SqlConnectionString.LastIndexOf("Password")) > 10)
+            if ((lastIndexOfPassword = cString.SqlConnectionString.LastIndexOf("Password")) > 10)
                 fileToUpload.DatabaseToBackUp = cString.SqlConnectionString.Substring(0, lastIndexOfPassword);
             await Task.Run(() =>
             {
@@ -551,7 +656,7 @@ namespace DBBackupLib
             return fileToUpload;
         }
 
-        public void SetError(Exception ex) { 
+        public void SetError(Exception ex) {
             Error = ex;
             IsFaulted = true;
             Logger.LogException(ex);
@@ -587,7 +692,7 @@ namespace DBBackupLib
                 try
                 {
                     DeleteFromGDriveResult = GoogleApis.DeleteFile(LocalFilePath, UploadedFileId);
-                }                
+                }
                 catch (Exception ex) {
                     //cString.HasErrors = true;
                     SetError(ex);
@@ -595,7 +700,7 @@ namespace DBBackupLib
                 }
                 if (!string.IsNullOrWhiteSpace(DeleteFromGDriveResult))
                 {
-                    if(cString != null)  cString.HasErrors = true;
+                    if (cString != null) cString.HasErrors = true;
                     Exception ex1 = new Exception($"{LocalFilePath} could not be deleted from GDrive (Id: {UploadedFileId})", new Exception(DeleteFromGDriveResult));
                     SetError(ex1);
                     throw ex1;
@@ -612,6 +717,7 @@ namespace DBBackupLib
                 throw new Exception($"{LocalFilePath} file already deleted!");
             File.Delete(LocalFilePath);
             IsLocalZipDeleted = true;
+            string deletePath = Path.GetDirectoryName(LocalFilePath);            
         }
 
         public static void SaveFileToUploadList(IEnumerable<FileToUpload> latestUploadedFiles) {
@@ -621,11 +727,13 @@ namespace DBBackupLib
 
         public static List<FileToUpload> GetFileToUploadListFromSettings()
         {
+            if (!File.Exists(LastestUploadedSettingFile))
+                return new List<FileToUpload>();
             string jsonLastestFilesUploaded = File.ReadAllText(LastestUploadedSettingFile);
             if (string.IsNullOrWhiteSpace(jsonLastestFilesUploaded))
                 return new List<FileToUpload>();
             JsonConvert.DefaultSettings = () => new JsonSerializerSettings { ContractResolver = new NonPublicPropertiesResolver() };
-            List<FileToUpload> filesUploaded = JsonConvert.DeserializeObject<List<FileToUpload>>(jsonLastestFilesUploaded);            
+            List<FileToUpload> filesUploaded = JsonConvert.DeserializeObject<List<FileToUpload>>(jsonLastestFilesUploaded);
             return filesUploaded;
         }
 
@@ -643,6 +751,16 @@ namespace DBBackupLib
                 await Logger.LogException(ex);
             }
         }
+    }
+
+    public class UploadedFiles { 
+    
+        public string FileId { get; set;}
+
+        public string Filename { get; set; }
+
+        public DateTime GCreatedOn { get; set; }
+
     }
 
     public class ViewCoreModule : IModule
