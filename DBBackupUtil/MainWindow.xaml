@@ -153,7 +153,7 @@
                             <Path Stretch="Fill" Fill="Red" Stroke="{x:Null}" StrokeThickness="3" Data="M3.875,0 L5.125,0 5.125,3.875 9,3.875 9,5.125 5.125,5.125 5.125,9 3.875,9 3.875,5.125 0,5.125 0,3.875 3.875,3.875 3.875,0 z" />
                         </Button>
                         <!--<Button Content="Settings" Name="btnSettings" Click="btnSettings_Click" Grid.Column="1" HorizontalAlignment="Left" Margin="421,5,0,0" Grid.Row="2" VerticalAlignment="Top" Width="116" Height="40"/>-->
-                        <Button Content="Clean Up" Name="btnCleanLocalAndGDrive" Click="btnCleanLocalAndGDrive_Click" Grid.Column="1" HorizontalAlignment="Left" Margin="421,5,0,0" Grid.Row="2" VerticalAlignment="Top" Width="116" Height="40"/>
+                        <!--<Button Content="Clean Up" Name="btnCleanLocalAndGDrive" Click="btnCleanLocalAndGDrive_Click" Grid.Column="1" HorizontalAlignment="Left" Margin="421,5,0,0" Grid.Row="2" VerticalAlignment="Top" Width="116" Height="40"/>-->
                     </Grid>
                     <Grid x:Name="DialogReplacement" Grid.Row="1" Grid.ColumnSpan="2" Visibility="{Binding MainViewModel.IsDeletingPreviousHoursBackupFiles, Source={StaticResource ServiceLocator}, Converter={StaticResource BoolToVisibilityConverter}}">
                         <Grid Background="Black" Opacity="0.5"/>

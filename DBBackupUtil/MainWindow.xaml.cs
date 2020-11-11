@@ -4,6 +4,7 @@ using com.rusanu.dataconnectiondialog;
 using DBBackupLib;
 using System;
 using System.Data.SqlClient;
+using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -32,6 +33,8 @@ namespace DBBackupUtil
         {
             InitializeComponent();
             StateChanged += MainWindowStateChangeRaised;
+            AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+            TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
             Win32Parent.AssignHandle(new WindowInteropHelper(this).Handle);
             MainViewModel = ServiceProvider.Get<MainViewModel>();
             DataContext = MainViewModel;
@@ -40,14 +43,32 @@ namespace DBBackupUtil
             {
                 MainViewModel.Dispose();                
             };
-            Activated += (sender, args) => { 
-
+            Loaded += (sender, args) => {
+                string logChar = string.Format(MainViewModel.LogChars, DateTime.Now + " : " + "{0}");
+                File.AppendAllText(MainViewModel.BackupLogFile, string.Format(logChar, $"\n" + "Backup Application Started!" + "\n\n"));
             };
             ContentRendered += (sender, args) => { 
             
             };
+            
         }
 
+        private void TaskScheduler_UnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs e)
+        {
+            if (!e.Observed)
+            {
+                string logChar = string.Format(MainViewModel.LogChars, DateTime.Now + " : " + "{0}");
+                Logger.LogException(e.Exception == null ? new Exception("Unhandled Exception....") : e.Exception).Wait(1);
+                File.AppendAllText(MainViewModel.BackupLogFile, string.Format(logChar, e.Exception + "\n"));
+            }
+        }
+
+        private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            string logChar = string.Format(MainViewModel.LogChars, DateTime.Now + " : " + "{0}");
+            Logger.LogException(new Exception(e.ExceptionObject == null ? "Unhandled Exception...." : e.ExceptionObject.ToString())).Wait(1);
+            File.AppendAllText(MainViewModel.BackupLogFile, string.Format(logChar, e.ExceptionObject +"\n"));
+        }
 
         private void btnSelectFolder_Click(object sender, RoutedEventArgs e)
         {
@@ -169,7 +190,7 @@ namespace DBBackupUtil
             else
             {
                 MainWindowBorder.BorderThickness = new Thickness(0);
-                //RestoreButton.Visibility = Visibility.Collapsed;
+                RestoreButton.Visibility = Visibility.Collapsed;
                 //MaximizeButton.Visibility = Visibility.Visible;
             }
         }
